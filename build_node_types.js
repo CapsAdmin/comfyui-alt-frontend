@@ -4,65 +4,73 @@ let str = fs.readFileSync("./nodes.json", "utf8");
 let nodes = JSON.parse(str);
 delete nodes.EmptySegs;
 let out = `
-	let id = 1
-	let workflow = {version: 0.4, nodes: [], output: {}}
+let id = 0
+let workflow = {version: 0.4, nodes: [], output: {}}
 
-	export const StartNodeContext = () => {
-		id = 1
-		workflow = {version: 0.4, nodes: [], output: {}}
+const StartNodeContext = () => {
+	id = 0
+	workflow = {version: 0.4, nodes: [], output: {}}
+}
+
+const EndNodeContext = () => {
+	return workflow
+}
+
+const addNode = (type: string, node: any, input: any) => {
+	node.id = id++
+	node.type = type
+
+	workflow.output[node.id] = {
+		class_type: node.type,
+		inputs: input,
 	}
 
-	export const EndNodeContext = () => {
-		return workflow
-	}
+	workflow.nodes.push(node)
+}
 
-	const addNode = (node, input) => {
-		node.slot = (index: number) => {
-			return [node.id.toString(), index]
-		  }
-		workflow.output[node.id] = {
-			class_type: node.type,
-			inputs: input,
-			}
-		workflow.nodes.push(node)
-	}
+export const BuildWorkflow = (fn: () => void) => {
+	StartNodeContext()
+	fn()
+	return EndNodeContext()
+}
+
 `;
 
 const emitProp = (name, prop) => {
   if (name.endsWith("_name") || name.includes("_name_")) {
-	return "string";
+    return "string";
   }
 
   if (name == "image") {
-	return '"' + name.toUpperCase() + '"';
+    return '"' + name.toUpperCase() + '"';
   }
 
   const type = prop[0];
   if (type == "INT" || type == "FLOAT") {
-	return "number";
+    return "number";
   } else if (type == "STRING") {
-		return "string";
+    return "string";
   } else if (typeof type == "string" && type.toUpperCase() == type) {
-	return '"' + type.toUpperCase() + '"';
+    return '"' + type.toUpperCase() + '"';
   } else if (typeof type == "boolean") {
-	return "boolean";
+    return "boolean";
   } else if (Array.isArray(prop)) {
-	let strings = [];
-	for (let string of prop) {
-	  if (typeof string == "string") {
-		strings.push('"' + string + '"');
-	  } else if (Array.isArray(string)) {
-		strings.push(emitProp(name, string));
-	  }
-	}
+    let strings = [];
+    for (let string of prop) {
+      if (typeof string == "string") {
+        strings.push('"' + string + '"');
+      } else if (Array.isArray(string)) {
+        strings.push(emitProp(name, string));
+      }
+    }
 
-	if (strings.length == 0) {
-	  return "any";
-	}
+    if (strings.length == 0) {
+      return "any";
+    }
 
-	return strings.join(" | ");
+    return strings.join(" | ");
   } else {
-	return "any";
+    return "any";
   }
 };
 
@@ -71,28 +79,25 @@ const emitNode = (name, node) => {
   out += `export const ${name} = (input: `;
   out += `{\n`;
   for (const [name, prop] of Object.entries(node.input.required)) {
-	out += `        ["${name}"]: ${emitProp(name, prop)} | [string, number]\n`;
+    out += `        ["${name}"]: ${emitProp(name, prop)} | [string, number]\n`;
   }
   if (node.input.optional) {
-	for (const [name, prop] of Object.entries(node.input.optional)) {
-	  out += `        ["${name}"]?: ${emitProp(name, prop)} | [string, number]\n`;
-	}
+    for (const [name, prop] of Object.entries(node.input.optional)) {
+      out += `        ["${name}"]?: ${emitProp(
+        name,
+        prop
+      )} | [string, number]\n`;
+    }
   }
   out += `}) => {\n`;
-  out += `    id++;\n`;
-  out += `    const node = {`;
-  out += `        id: id,\n`;
-  out += `        type: "${name}",\n`;
-
-  let i = 0
+  out += `    const node = {\n`;
+  let i = 0;
   for (const prop of node.output) {
-	out += `        ${prop}${i}: [id.toString(), ${i}] as [string, number],\n`;
-	i++
-}
-
-
-  out += `    } as const\n`
-  out += `    addNode(node, input)\n`;  
+    out += `        ${prop}${i}: [id.toString(), ${i}] as [string, number],\n`;
+    i++;
+  }
+  out += `    } as const\n`;
+  out += `    addNode("${name}", node, input)\n`;
   out += `    return node;\n`;
   out += `};\n\n`;
 };

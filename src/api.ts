@@ -1,3 +1,5 @@
+import { Ref, useEffect, useState } from "react";
+
 class ComfyApi extends EventTarget {
     #registered = new Set();
     socket?: WebSocket;
@@ -232,7 +234,7 @@ class ComfyApi extends EventTarget {
      * @param {number} number The index at which to queue the prompt, passing -1 will insert the prompt at the front of the queue
      * @param {object} prompt The prompt data to queue
      */
-    async queuePrompt(number: number, { output, workflow }: { output: any, workflow: any }) {
+    async queuePrompt(number: number, prompt: any) {
         const body: {
             client_id?: string,
             prompt: string,
@@ -241,8 +243,8 @@ class ComfyApi extends EventTarget {
             number?: number,
         } = {
             client_id: this.clientId,
-            prompt: output,
-            extra_data: { extra_pnginfo: { workflow } },
+            prompt: prompt.output,
+            extra_data: { extra_pnginfo: { workflow: prompt.workflow } },
         };
 
         if (number === -1) {
@@ -359,3 +361,119 @@ class ComfyApi extends EventTarget {
 }
 
 export const api = new ComfyApi();
+
+export interface AvailableData {
+    checkpoints: string[]
+    embeddings: string[]
+    hypernetworks: string[]
+    loras: string[]
+    controlnets: string[]
+    samplingMethods: string[]
+    samplingSchedulers: string[]
+}
+
+export const useComfyAPI = (imgRef: Ref<HTMLImageElement>) => {
+    const [availableData, setAvailableData] = useState<AvailableData>({
+        checkpoints: [],
+        embeddings: [],
+        hypernetworks: [],
+        loras: [],
+        controlnets: [],
+        samplingMethods: [],
+        samplingSchedulers: [],
+    });
+
+    const [progress, setProgress] = useState(0);
+    const [maxProgress, setMaxProgress] = useState(0);
+
+    useEffect(() => {
+        api.protocol = "http";
+        api.host = "127.0.0.1:8188";
+
+        /*
+    
+        api.addEventListener("status", (data) => {
+          console.log("status", data.detail);
+        });
+    
+        api.addEventListener("reconnecting", () => {
+          console.log("reconnecting");
+        });
+    
+        api.addEventListener("reconnected", () => {
+          console.log("reconnected");
+        });
+    
+        api.addEventListener("executing", (data) => {
+          console.log("executing", data);
+        });
+    
+        api.addEventListener("execution_start", (data) => {
+          console.log("execution_start", data);
+        });
+    
+        api.addEventListener("execution_error", (data) => {
+          console.log("execution_error", data);
+        });
+    
+    */
+        const progress = (data) => {
+            const progress = data.detail.value as number;
+            const max = data.detail.max as number;
+
+            setProgress(progress);
+            setMaxProgress(max);
+        };
+        const executed = async (data) => {
+            let img = data.detail.output.images[0];
+            const blob = await api.view(img);
+
+            imgRef.current.src = URL.createObjectURL(blob);
+        };
+
+        const b_preview = (data: any) => {
+            let blob = data.detail as Blob;
+            console.log(imgRef.current)
+            imgRef.current.src = URL.createObjectURL(blob);
+        };
+
+        api.addEventListener("progress", progress);
+        api.addEventListener("executed", executed);
+        api.addEventListener("b_preview", b_preview);
+
+        api.init();
+
+        (async () => {
+            const nodes = await api.getNodes();
+            const embeddings = await api.getEmbeddings()
+            const checkpoints = nodes.CheckpointLoaderSimple.input.required.ckpt_name[0]
+            const samplingMethods = nodes.KSamplerAdvanced.input.required.sampler_name[0]
+            const samplingSchedulers = nodes.KSamplerAdvanced.input.required.scheduler[0]
+            const loras = nodes.LoraLoader.input.required.lora_name[0]
+            const hypernetworks = nodes.HypernetworkLoader.input.required.hypernetwork_name[0]
+            const controlnets = nodes.ControlNetLoader.input.required.control_net_name[0]
+
+            setAvailableData({
+                checkpoints,
+                embeddings,
+                hypernetworks,
+                loras,
+                controlnets,
+                samplingMethods,
+                samplingSchedulers,
+            });
+        })();
+
+        return () => {
+            api.removeEventListener("progress", progress);
+            api.removeEventListener("executed", executed);
+            api.removeEventListener("b_preview", b_preview);
+        };
+    }, []);
+
+    return [
+        availableData,
+        progress,
+        maxProgress,
+    ] as const
+}

@@ -1,72 +1,90 @@
-import { AvailableData } from "../api";
+import { AvailableData as ComfyResources } from "../api";
+import { ControlNetConditioner } from "../components/ControlNetConditioner";
 import {
+    BuildWorkflow,
     CLIPTextEncode,
     CheckpointLoaderSimple,
     EmptyLatentImage,
+    HypernetworkLoader,
     KSamplerAdvanced,
-    PreviewImage,
-    BuildWorkflow,
-    VAEDecode,
     LoraLoader,
+    PreviewImage,
+    VAEDecode,
 } from "../nodes";
 
-const injectEmbeddings = (text: string, availableData: AvailableData) => {
+const injectEmbeddings = (text: string, availableData: ComfyResources) => {
     for (const embedding_path of availableData.embeddings) {
-        const keyword = "embedding:" + embedding_path + ".pt"
-        const filename = embedding_path.split("/").pop()!
-        text = text.replace(filename, keyword)
+        const keyword = "embedding:" + embedding_path + ".pt";
+        const filename = embedding_path.split("/").pop()!;
+        text = text.replace(filename, keyword);
     }
-    return text
-}
+    return text;
+};
 
 const findAngleBracketsWeight = (text: string, tag: string) => {
     const found: Array<{
         name: string;
         weight: number;
-    }> = []
+    }> = [];
 
     // <TAG:NAME:WEIGHT>
     const regex = new RegExp(`<${tag}:(.+?):(.+?)>`, "g");
     let match: RegExpExecArray | null;
     while ((match = regex.exec(text)) !== null) {
-        const name = match[1]
-        const weight = parseFloat(match[2])
-        found.push({ name, weight })
+        const name = match[1];
+        const weight = parseFloat(match[2]);
+        found.push({ name, weight });
     }
 
-    return found
-}
+    return found;
+};
 
 const stripAngleBrackets = (text: string) => {
     const regex = new RegExp(`<.+:(.+):(.+)>`, "g");
 
-    text = text.replace(regex, "")
+    text = text.replace(regex, "");
 
-    return text
-}
+    return text;
+};
 
-const findLoras = (text: string, availableData: AvailableData) => {
+const findLoras = (text: string, availableData: ComfyResources) => {
     const found: Array<{
         path: string;
         weight: number;
-    }> = []
+    }> = [];
 
     findAngleBracketsWeight(text, "lora").forEach(({ name, weight }) => {
-        const path = availableData.loras.find((path) => path.includes(name))
+        const path = availableData.loras.find((path) => path.includes(name));
         if (path) {
-            found.push({ path, weight })
+            found.push({ path, weight });
         }
-    })
+    });
 
     findAngleBracketsWeight(text, "lycoris").forEach(({ name, weight }) => {
-        const path = availableData.loras.find((path) => path.includes(name))
+        const path = availableData.loras.find((path) => path.includes(name));
         if (path) {
-            found.push({ path, weight })
+            found.push({ path, weight });
         }
-    })
+    });
 
-    return found
-}
+    return found;
+};
+
+const findHyperNetworks = (text: string, availableData: ComfyResources) => {
+    const found: Array<{
+        path: string;
+        weight: number;
+    }> = [];
+
+    findAngleBracketsWeight(text, "hypernetwork").forEach(({ name, weight }) => {
+        const path = availableData.hypernetworks.find((path) => path.includes(name));
+        if (path) {
+            found.push({ path, weight });
+        }
+    });
+
+    return found;
+};
 
 export const Txt2Img = (config: {
     checkpoint: string;
@@ -87,33 +105,63 @@ export const Txt2Img = (config: {
     cfgScale: number;
     seed: number;
 
-    availableData: AvailableData;
+    resources: ComfyResources;
+
+    conditioners: Array<ControlNetConditioner>;
 }) => {
-    const positiveLoras = findLoras(config.positive, config.availableData)
-    const negativeLoras = findLoras(config.negative, config.availableData)
-
-    const positive = injectEmbeddings(stripAngleBrackets(config.positive), config.availableData)
-    const negative = injectEmbeddings(stripAngleBrackets(config.negative), config.availableData)
-
-    console.log(positiveLoras, negativeLoras)
-    console.log(positive, negative)
-
     return BuildWorkflow(() => {
+        const loras = findLoras(config.positive, config.resources);
+        const hypernetworks = findHyperNetworks(config.positive, config.resources);
+
+        let positive = stripAngleBrackets(config.positive);
+        let negative = stripAngleBrackets(config.negative);
+
+        positive = injectEmbeddings(positive, config.resources);
+        negative = injectEmbeddings(negative, config.resources);
+
         const checkpoint = CheckpointLoaderSimple({
             ckpt_name: config.checkpoint,
         });
 
-        let model: { MODEL0: [string, number], CLIP1: [string, number] } = checkpoint
+        let model: { MODEL0: [string, number] } = checkpoint;
 
-        for (const { path, weight } of positiveLoras) {
-            model = LoraLoader({
+        for (const { path, weight } of hypernetworks) {
+            model = HypernetworkLoader({
+                hypernetwork_name: path,
+                model: model.MODEL0,
+                strength: weight,
+            });
+        }
+
+        let clip: { CLIP1: [string, number] } = checkpoint;
+
+        for (const { path, weight } of loras) {
+            const loraModel = LoraLoader({
                 lora_name: path,
-                model: checkpoint.MODEL0,
-                clip: checkpoint.CLIP1,
+                model: model.MODEL0,
+                clip: clip.CLIP1,
                 strength_clip: weight,
                 strength_model: weight,
-            })
+            });
+            clip = loraModel;
+            model = loraModel;
         }
+
+        let positiveCondioning = CLIPTextEncode({
+            text: positive,
+            clip: clip.CLIP1,
+        });
+
+        if (config.conditioners) {
+            for (const conditioner of config.conditioners) {
+                positiveCondioning = conditioner.apply(positiveCondioning);
+            }
+        }
+
+        const negativeCondioning = CLIPTextEncode({
+            text: negative,
+            clip: clip.CLIP1,
+        });
 
         PreviewImage({
             images: VAEDecode({
@@ -124,18 +172,14 @@ export const Txt2Img = (config: {
                     cfg: config.cfgScale,
                     sampler_name: config.samplingMethod,
                     scheduler: config.samplingScheduler,
+
                     start_at_step: 0,
                     end_at_step: 10000,
+
                     return_with_leftover_noise: "disable",
                     model: model.MODEL0,
-                    positive: CLIPTextEncode({
-                        text: positive,
-                        clip: model.CLIP1,
-                    }).CONDITIONING0,
-                    negative: CLIPTextEncode({
-                        text: negative,
-                        clip: model.CLIP1,
-                    }).CONDITIONING0,
+                    positive: positiveCondioning.CONDITIONING0,
+                    negative: negativeCondioning.CONDITIONING0,
                     latent_image: EmptyLatentImage({
                         width: config.width,
                         height: config.height,

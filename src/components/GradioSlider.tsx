@@ -15,7 +15,7 @@ export default function GradioSlider(props: {
   onChange: (v: number) => void,
   min: number,
   max: number,
-  step: number,
+  step?: number,
   label: string,
 }) {
   const handleSliderChange = (event: Event, newValue: number | number[]) => {

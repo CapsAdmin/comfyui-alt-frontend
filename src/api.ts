@@ -15,8 +15,11 @@ class ComfyApi extends EventTarget {
         return await fetch(this.protocol + "://" + this.host + input, init);
     }
 
-
-    addEventListener(type: string, callback: (evt: Event) => void, options?: AddEventListenerOptions) {
+    addEventListener(
+        type: string,
+        callback: (evt: Event) => void,
+        options?: AddEventListenerOptions
+    ) {
         super.addEventListener(type, callback, options);
         this.#registered.add(type);
     }
@@ -28,7 +31,7 @@ class ComfyApi extends EventTarget {
         setInterval(async () => {
             try {
                 const resp = await this.fetch("/prompt");
-                const status = await resp.json() as string;
+                const status = (await resp.json()) as string;
                 this.dispatchEvent(new CustomEvent("status", { detail: status }));
             } catch (error) {
                 this.dispatchEvent(new CustomEvent("status", { detail: null }));
@@ -89,53 +92,54 @@ class ComfyApi extends EventTarget {
                     switch (eventType) {
                         case 1:
                             const view2 = new DataView(event.data);
-                            const imageType = view2.getUint32(0)
-                            let imageMime
+                            const imageType = view2.getUint32(0);
+                            let imageMime;
                             switch (imageType) {
                                 case 1:
                                 default:
                                     imageMime = "image/jpeg";
                                     break;
                                 case 2:
-                                    imageMime = "image/png"
+                                    imageMime = "image/png";
                             }
                             const imageBlob = new Blob([buffer.slice(4)], { type: imageMime });
                             this.dispatchEvent(new CustomEvent("b_preview", { detail: imageBlob }));
                             break;
                         default:
-                            throw new Error(`Unknown binary websocket message of type ${eventType}`);
+                            throw new Error(
+                                `Unknown binary websocket message of type ${eventType}`
+                            );
                     }
                 } else {
                     const msg = JSON.parse(event.data) as
-                        {
-                            type: "status",
-                            data: { sid?: string, status: string }
-                        } |
-                        {
-                            type: "progress",
-                            data: any,
-                        } |
-                        {
-                            type: "executing",
-                            data: { node: any },
-                        } |
-                        {
-                            type: "executed",
-                            data: any,
-                        } |
-                        {
-                            type: "execution_start",
-                            data: any,
-                        } |
-                        {
-                            type: "execution_cached",
-                            data: any,
-                        } |
-                        {
-                            type: "execution_error",
-                            data: any,
-                        }
-
+                        | {
+                              type: "status";
+                              data: { sid?: string; status: string };
+                          }
+                        | {
+                              type: "progress";
+                              data: any;
+                          }
+                        | {
+                              type: "executing";
+                              data: { node: any };
+                          }
+                        | {
+                              type: "executed";
+                              data: any;
+                          }
+                        | {
+                              type: "execution_start";
+                              data: any;
+                          }
+                        | {
+                              type: "execution_cached";
+                              data: any;
+                          }
+                        | {
+                              type: "execution_error";
+                              data: any;
+                          };
 
                     switch (msg.type) {
                         case "status":
@@ -143,30 +147,42 @@ class ComfyApi extends EventTarget {
                                 this.clientId = msg.data.sid;
                                 window.name = this.clientId;
                             }
-                            this.dispatchEvent(new CustomEvent("status", { detail: msg.data.status }));
+                            this.dispatchEvent(
+                                new CustomEvent("status", { detail: msg.data.status })
+                            );
                             break;
                         case "progress":
                             this.dispatchEvent(new CustomEvent("progress", { detail: msg.data }));
                             break;
                         case "executing":
-                            this.dispatchEvent(new CustomEvent("executing", { detail: msg.data.node }));
+                            this.dispatchEvent(
+                                new CustomEvent("executing", { detail: msg.data.node })
+                            );
                             break;
                         case "executed":
                             this.dispatchEvent(new CustomEvent("executed", { detail: msg.data }));
                             break;
                         case "execution_start":
-                            this.dispatchEvent(new CustomEvent("execution_start", { detail: msg.data }));
+                            this.dispatchEvent(
+                                new CustomEvent("execution_start", { detail: msg.data })
+                            );
                             break;
                         case "execution_error":
-                            this.dispatchEvent(new CustomEvent("execution_error", { detail: msg.data }));
+                            this.dispatchEvent(
+                                new CustomEvent("execution_error", { detail: msg.data })
+                            );
                             break;
                         case "execution_cached":
-                            this.dispatchEvent(new CustomEvent("execution_cached", { detail: msg.data }));
+                            this.dispatchEvent(
+                                new CustomEvent("execution_cached", { detail: msg.data })
+                            );
                             break;
                         default:
-                            const umsg = msg as { type: string, data: any };
+                            const umsg = msg as { type: string; data: any };
                             if (this.#registered.has(umsg.type)) {
-                                this.dispatchEvent(new CustomEvent(umsg.type, { detail: umsg.data }));
+                                this.dispatchEvent(
+                                    new CustomEvent(umsg.type, { detail: umsg.data })
+                                );
                             } else {
                                 throw new Error(`Unknown message type ${umsg.type}`);
                             }
@@ -213,11 +229,11 @@ class ComfyApi extends EventTarget {
     }
 
     async view(req: {
-        filename: string,
-        type?: string,
-        subfolder?: string,
-        channel?: string,
-        preview?: string,
+        filename: string;
+        type?: string;
+        subfolder?: string;
+        channel?: string;
+        preview?: string;
     }) {
         const query = new URLSearchParams(req as any);
         const resp = await this.fetch("/view" + "?" + query.toString(), { cache: "no-store" });
@@ -236,11 +252,11 @@ class ComfyApi extends EventTarget {
      */
     async queuePrompt(number: number, prompt: any) {
         const body: {
-            client_id?: string,
-            prompt: string,
-            extra_data: { extra_pnginfo: { workflow: string } },
-            front?: boolean,
-            number?: number,
+            client_id?: string;
+            prompt: string;
+            extra_data: { extra_pnginfo: { workflow: string } };
+            front?: boolean;
+            number?: number;
         } = {
             client_id: this.clientId,
             prompt: prompt.output,
@@ -266,6 +282,53 @@ class ComfyApi extends EventTarget {
                 response: await res.json(),
             };
         }
+
+        return (await res.json()) as { prompt_id: string; number: number };
+    }
+
+    awaitingPrompts = new Map<string, any>();
+
+    async executePrompt(
+        number: number,
+        prompt: any,
+        onPreviewImage?: (img: string) => void,
+        onProgress?: (prog: number, max: number) => void
+    ): Promise<{
+        node: string;
+        output: {
+            images: Array<{
+                filename: string;
+                subfolder: string;
+                type: string;
+            }>;
+        };
+        prompt_id: string;
+    }> {
+        const progress = (data: any) => {
+            const progress = data.detail.value as number;
+            const max = data.detail.max as number;
+            if (onProgress) onProgress(progress, max);
+        };
+
+        const b_preview = (data: any) => {
+            if (onPreviewImage) onPreviewImage(URL.createObjectURL(data.detail as Blob));
+        };
+
+        this.addEventListener("progress", progress);
+        this.addEventListener("b_preview", b_preview);
+
+        const res = await this.queuePrompt(number, prompt);
+        return new Promise((resolve, reject) => {
+            const executed = (event: any) => {
+                if (event.detail.prompt_id === res.prompt_id) {
+                    this.removeEventListener("executed", executed);
+                    this.removeEventListener("progress", progress);
+                    this.removeEventListener("b_preview", b_preview);
+                    resolve(event.detail);
+                }
+            };
+            this.addEventListener("executed", executed);
+        });
     }
 
     /**
@@ -287,7 +350,10 @@ class ComfyApi extends EventTarget {
     async getQueue() {
         try {
             const res = await this.fetch("/queue");
-            const data = await res.json() as { queue_running: Array<string>, queue_pending: Array<string> };
+            const data = (await res.json()) as {
+                queue_running: Array<string>;
+                queue_pending: Array<string>;
+            };
             return {
                 // Running action uses a different endpoint for cancelling
                 Running: data.queue_running.map((prompt) => ({
@@ -358,22 +424,43 @@ class ComfyApi extends EventTarget {
     async interrupt() {
         await this.#postItem("interrupt", null);
     }
+
+    async uploadFile(file: File) {
+        try {
+            const body = new FormData();
+            body.append("image", file);
+            body.append("overwrite", "true");
+            const resp = await this.fetch("/upload/image", {
+                method: "POST",
+                body,
+            });
+            if (resp.status === 200) {
+                const data = await resp.json();
+
+                return data;
+            } else {
+                alert(resp.status + " - " + resp.statusText);
+            }
+        } catch (error) {
+            alert(error);
+        }
+    }
 }
 
 export const api = new ComfyApi();
 
 export interface AvailableData {
-    checkpoints: string[]
-    embeddings: string[]
-    hypernetworks: string[]
-    loras: string[]
-    controlnets: string[]
-    samplingMethods: string[]
-    samplingSchedulers: string[]
+    checkpoints: string[];
+    embeddings: string[];
+    hypernetworks: string[];
+    loras: string[];
+    controlnets: string[];
+    samplingMethods: string[];
+    samplingSchedulers: string[];
 }
 
-export const useComfyAPI = (imgRef: Ref<HTMLImageElement>) => {
-    const [availableData, setAvailableData] = useState<AvailableData>({
+export const useComfyAPI = () => {
+    const [resources, setResources] = useState<AvailableData>({
         checkpoints: [],
         embeddings: [],
         hypernetworks: [],
@@ -382,9 +469,6 @@ export const useComfyAPI = (imgRef: Ref<HTMLImageElement>) => {
         samplingMethods: [],
         samplingSchedulers: [],
     });
-
-    const [progress, setProgress] = useState(0);
-    const [maxProgress, setMaxProgress] = useState(0);
 
     useEffect(() => {
         api.protocol = "http";
@@ -417,43 +501,19 @@ export const useComfyAPI = (imgRef: Ref<HTMLImageElement>) => {
         });
     
     */
-        const progress = (data) => {
-            const progress = data.detail.value as number;
-            const max = data.detail.max as number;
-
-            setProgress(progress);
-            setMaxProgress(max);
-        };
-        const executed = async (data) => {
-            let img = data.detail.output.images[0];
-            const blob = await api.view(img);
-
-            imgRef.current.src = URL.createObjectURL(blob);
-        };
-
-        const b_preview = (data: any) => {
-            let blob = data.detail as Blob;
-            console.log(imgRef.current)
-            imgRef.current.src = URL.createObjectURL(blob);
-        };
-
-        api.addEventListener("progress", progress);
-        api.addEventListener("executed", executed);
-        api.addEventListener("b_preview", b_preview);
-
         api.init();
 
         (async () => {
             const nodes = await api.getNodes();
-            const embeddings = await api.getEmbeddings()
-            const checkpoints = nodes.CheckpointLoaderSimple.input.required.ckpt_name[0]
-            const samplingMethods = nodes.KSamplerAdvanced.input.required.sampler_name[0]
-            const samplingSchedulers = nodes.KSamplerAdvanced.input.required.scheduler[0]
-            const loras = nodes.LoraLoader.input.required.lora_name[0]
-            const hypernetworks = nodes.HypernetworkLoader.input.required.hypernetwork_name[0]
-            const controlnets = nodes.ControlNetLoader.input.required.control_net_name[0]
+            const embeddings = await api.getEmbeddings();
+            const checkpoints = nodes.CheckpointLoaderSimple.input.required.ckpt_name[0];
+            const samplingMethods = nodes.KSamplerAdvanced.input.required.sampler_name[0];
+            const samplingSchedulers = nodes.KSamplerAdvanced.input.required.scheduler[0];
+            const loras = nodes.LoraLoader.input.required.lora_name[0];
+            const hypernetworks = nodes.HypernetworkLoader.input.required.hypernetwork_name[0];
+            const controlnets = nodes.ControlNetLoader.input.required.control_net_name[0];
 
-            setAvailableData({
+            setResources({
                 checkpoints,
                 embeddings,
                 hypernetworks,
@@ -463,17 +523,7 @@ export const useComfyAPI = (imgRef: Ref<HTMLImageElement>) => {
                 samplingSchedulers,
             });
         })();
-
-        return () => {
-            api.removeEventListener("progress", progress);
-            api.removeEventListener("executed", executed);
-            api.removeEventListener("b_preview", b_preview);
-        };
     }, []);
 
-    return [
-        availableData,
-        progress,
-        maxProgress,
-    ] as const
-}
+    return resources;
+};

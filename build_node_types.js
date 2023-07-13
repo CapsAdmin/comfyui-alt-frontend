@@ -1,9 +1,11 @@
 import fs from "fs";
 
-let str = fs.readFileSync("./nodes.json", "utf8");
-let nodes = JSON.parse(str);
+const res = await fetch("http://127.0.0.1:8188/object_info")
+const nodes = await res.json()
 delete nodes.EmptySegs;
 let out = `
+type Link = [string, number]
+
 let id = 0
 let workflow = {version: 0.4, nodes: [], output: {}}
 
@@ -42,7 +44,7 @@ const emitProp = (name, prop) => {
   }
 
   if (name == "image") {
-    return '"' + name.toUpperCase() + '"';
+    return "string | \"IMAGE\"";
   }
 
   const type = prop[0];
@@ -75,25 +77,25 @@ const emitProp = (name, prop) => {
 };
 
 const emitNode = (name, node) => {
-  name = name.replace(/^[^a-zA-Z_$]|[^0-9a-zA-Z_$]/g, "_");
-  out += `export const ${name} = (input: `;
+  const jsname = name.replace(/^[^a-zA-Z_$]|[^0-9a-zA-Z_$]/g, "_");
+  out += `export const ${jsname} = (input: `;
   out += `{\n`;
   for (const [name, prop] of Object.entries(node.input.required)) {
-    out += `        ["${name}"]: ${emitProp(name, prop)} | [string, number]\n`;
+    out += `        ["${name}"]: ${emitProp(name, prop)} | Link\n`;
   }
   if (node.input.optional) {
     for (const [name, prop] of Object.entries(node.input.optional)) {
       out += `        ["${name}"]?: ${emitProp(
         name,
         prop
-      )} | [string, number]\n`;
+      )} | Link\n`;
     }
   }
   out += `}) => {\n`;
   out += `    const node = {\n`;
   let i = 0;
   for (const prop of node.output) {
-    out += `        ${prop}${i}: [id.toString(), ${i}] as [string, number],\n`;
+    out += `        ${prop}${i}: [id.toString(), ${i}] as Link,\n`;
     i++;
   }
   out += `    } as const\n`;
@@ -106,4 +108,4 @@ for (const [name, node] of Object.entries(nodes)) {
   emitNode(name, node);
 }
 
-fs.writeFileSync("./src/nodes.ts", out);
+fs.writeFileSync("./src/Api/Nodes.ts", out);

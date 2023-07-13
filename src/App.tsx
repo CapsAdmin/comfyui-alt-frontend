@@ -2,7 +2,7 @@ import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import * as React from 'react';
-import { Txt2ImgTab } from './Txt2Img';
+import { CustomWorkflowPage } from './CustomWorkflow';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -48,7 +48,7 @@ export default function BasicTabs() {
         </Tabs>
       </Box>
       <CustomTabPanel value={value} index={0}>
-        <Txt2ImgTab />
+        <CustomWorkflowPage />
       </CustomTabPanel>
       <CustomTabPanel value={value} index={1}>
         Item Two

@@ -113,33 +113,33 @@ class ComfyApi extends EventTarget {
                 } else {
                     const msg = JSON.parse(event.data) as
                         | {
-                              type: "status";
-                              data: { sid?: string; status: string };
-                          }
+                            type: "status";
+                            data: { sid?: string; status: string };
+                        }
                         | {
-                              type: "progress";
-                              data: any;
-                          }
+                            type: "progress";
+                            data: any;
+                        }
                         | {
-                              type: "executing";
-                              data: { node: any };
-                          }
+                            type: "executing";
+                            data: { node: any };
+                        }
                         | {
-                              type: "executed";
-                              data: any;
-                          }
+                            type: "executed";
+                            data: any;
+                        }
                         | {
-                              type: "execution_start";
-                              data: any;
-                          }
+                            type: "execution_start";
+                            data: any;
+                        }
                         | {
-                              type: "execution_cached";
-                              data: any;
-                          }
+                            type: "execution_cached";
+                            data: any;
+                        }
                         | {
-                              type: "execution_error";
-                              data: any;
-                          };
+                            type: "execution_error";
+                            data: any;
+                        };
 
                     switch (msg.type) {
                         case "status":
@@ -449,7 +449,10 @@ class ComfyApi extends EventTarget {
 
 export const api = new ComfyApi();
 
-export interface AvailableData {
+api.protocol = "http";
+api.host = "127.0.0.1:8188";
+api.init();
+export interface ComfyResources {
     checkpoints: string[];
     embeddings: string[];
     hypernetworks: string[];
@@ -457,10 +460,11 @@ export interface AvailableData {
     controlnets: string[];
     samplingMethods: string[];
     samplingSchedulers: string[];
+    nodes: { [key: string]: ComfyNodeDef };
 }
 
 export const useComfyAPI = () => {
-    const [resources, setResources] = useState<AvailableData>({
+    const [resources, setResources] = useState<ComfyResources>({
         checkpoints: [],
         embeddings: [],
         hypernetworks: [],
@@ -468,41 +472,10 @@ export const useComfyAPI = () => {
         controlnets: [],
         samplingMethods: [],
         samplingSchedulers: [],
+        nodes: {},
     });
 
     useEffect(() => {
-        api.protocol = "http";
-        api.host = "127.0.0.1:8188";
-
-        /*
-    
-        api.addEventListener("status", (data) => {
-          console.log("status", data.detail);
-        });
-    
-        api.addEventListener("reconnecting", () => {
-          console.log("reconnecting");
-        });
-    
-        api.addEventListener("reconnected", () => {
-          console.log("reconnected");
-        });
-    
-        api.addEventListener("executing", (data) => {
-          console.log("executing", data);
-        });
-    
-        api.addEventListener("execution_start", (data) => {
-          console.log("execution_start", data);
-        });
-    
-        api.addEventListener("execution_error", (data) => {
-          console.log("execution_error", data);
-        });
-    
-    */
-        api.init();
-
         (async () => {
             const nodes = await api.getNodes();
             const embeddings = await api.getEmbeddings();
@@ -514,6 +487,7 @@ export const useComfyAPI = () => {
             const controlnets = nodes.ControlNetLoader.input.required.control_net_name[0];
 
             setResources({
+                nodes,
                 checkpoints,
                 embeddings,
                 hypernetworks,
@@ -527,3 +501,53 @@ export const useComfyAPI = () => {
 
     return resources;
 };
+
+export type ComfyNodeDef = {
+    name: string;
+    display_name?: string;
+    category: string;
+    output_node?: boolean;
+    input: ComfyNodeDefInputs;
+    /** Output type like "LATENT" or "IMAGE" */
+    output: string[];
+    output_name: string[];
+    output_is_list: boolean[];
+};
+
+export type ComfyNodeDefInputs = {
+    required: Record<string, ComfyNodeDefInput>;
+    optional?: Record<string, ComfyNodeDefInput>;
+};
+export type ComfyNodeDefInput = [ComfyNodeDefInputType, ComfyNodeDefInputOptions | null];
+
+/**
+ * - Array: Combo widget. Usually the values are strings but they can also be other stuff like booleans.
+ * - "INT"/"FLOAT"/etc.: Non-combo type widgets. See ComfyWidgets type.
+ * - other string: Must be a backend input type, usually something lke "IMAGE" or "LATENT".
+ */
+export type ComfyNodeDefInputType = any[] | string;
+
+export type ComfyNodeDefInputOptions = {
+    forceInput?: boolean;
+
+    // NOTE: For COMBO type inputs, the default value is always the first entry in the list.
+    default?: any;
+
+    // INT/FLOAT options
+    min?: number;
+    max?: number;
+    step?: number;
+
+    // STRING options
+    multiline?: boolean;
+};
+
+// TODO if/when comfy refactors
+export type ComfyNodeDefOutput = {
+    type: string;
+    name: string;
+    is_list?: boolean;
+};
+
+
+export type ComfyFile = { name: string; subfolder: string; type: string };

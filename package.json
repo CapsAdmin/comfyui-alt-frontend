@@ -12,10 +12,19 @@
   "dependencies": {
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.13.7",
     "@mui/material": "^5.13.7",
+    "@recogito/annotorious": "^2.7.11",
+    "@types/fabric": "^5.3.3",
+    "fabric": "^5.3.0",
+    "fabricjs-react": "^1.2.0",
+    "konva": "^9.2.0",
     "react": "^18.2.0",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
     "react-dom": "^18.2.0",
     "react-dropzone": "^14.2.3",
+    "react-konva": "^18.2.10",
     "typed-emitter": "^2.1.0"
   },
   "devDependencies": {

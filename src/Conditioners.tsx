@@ -1,8 +1,8 @@
-import { Stack, Typography } from "@mui/material";
-import { LabeledSlider } from "./components/LabeledSlider";
+import { Stack, Typography } from "@mui/material"
+import { LabeledSlider } from "./components/LabeledSlider"
 
-import { useEffect, useState } from "react";
-import { ComfyFile } from "./Api/Api";
+import { useEffect, useState } from "react"
+import { ComfyFile } from "./Api/Api"
 import {
     CLIPVisionEncode,
     CLIPVisionLoader,
@@ -12,16 +12,18 @@ import {
     LoadImage,
     StyleModelApply,
     StyleModelLoader,
-    Zoe_DepthMapPreprocessor
-} from "./Api/Nodes";
-import { ControlNetConditioner, ControlNetWithOptionalPreprocessor } from "./components/ControlNetWithOptionalConditioner";
-import { ImageUploadZone } from "./components/ImageUploadZone";
-import { LabeledCheckbox } from "./components/LabeledCheckbox";
-
+    Zoe_DepthMapPreprocessor,
+} from "./Api/Nodes"
+import {
+    ControlNetConditioner,
+    ControlNetWithOptionalPreprocessor,
+} from "./components/ControlNetWithOptionalConditioner"
+import { ImageUploadZone } from "./components/ImageUploadZone"
+import { LabeledCheckbox } from "./components/LabeledCheckbox"
 
 export const ControlNetCannyEdge = (props: {
-    id: number;
-    onChange: (conditioning: ControlNetConditioner) => void;
+    id: number
+    onChange: (conditioning: ControlNetConditioner) => void
 }) => (
     <ControlNetWithOptionalPreprocessor
         title="Canny Edge"
@@ -40,11 +42,11 @@ export const ControlNetCannyEdge = (props: {
         }}
         onChange={props.onChange}
     />
-);
+)
 
 export const ControlNetLineArt = (props: {
-    id: number;
-    onChange: (conditioning: ControlNetConditioner) => void;
+    id: number
+    onChange: (conditioning: ControlNetConditioner) => void
 }) => (
     <ControlNetWithOptionalPreprocessor
         title="Line Art"
@@ -61,10 +63,10 @@ export const ControlNetLineArt = (props: {
         }}
         onChange={props.onChange}
     />
-);
+)
 export const ControlNetDepth = (props: {
-    id: number;
-    onChange: (conditioning: ControlNetConditioner) => void;
+    id: number
+    onChange: (conditioning: ControlNetConditioner) => void
 }) => (
     <ControlNetWithOptionalPreprocessor
         title="Depth"
@@ -73,13 +75,13 @@ export const ControlNetDepth = (props: {
         checkpoint="t2iadapter_depth_sd15v2.pth"
         onChange={props.onChange}
     />
-);
+)
 
 export const ControlNetClipVision = (props: {
-    id: number;
-    onChange: (conditioning: ControlNetConditioner) => void;
+    id: number
+    onChange: (conditioning: ControlNetConditioner) => void
 }) => {
-    const [strength, setStrength] = useState(1);
+    const [strength, setStrength] = useState(1)
 
     return (
         <Stack>
@@ -92,36 +94,36 @@ export const ControlNetClipVision = (props: {
                         apply: (conditioning) => {
                             const image = LoadImage({
                                 image: file.name,
-                            });
+                            })
 
                             const clipVisionModel = CLIPVisionLoader({
                                 clip_name: "clip-vit-large-patch14.bin",
-                            });
+                            })
 
                             const styleModel = StyleModelLoader({
                                 style_model_name: "t2iadapter_style_sd14v1.pth",
-                            });
+                            })
 
                             const clipVisionEncoder = CLIPVisionEncode({
                                 image: image.IMAGE0,
                                 clip_vision: clipVisionModel.CLIP_VISION0,
-                            });
+                            })
 
                             const applier = StyleModelApply({
                                 style_model: styleModel.STYLE_MODEL0,
                                 clip_vision_output: clipVisionEncoder.CLIP_VISION_OUTPUT0,
                                 conditioning: conditioning.CONDITIONING0,
-                            });
+                            })
 
                             const averager = ConditioningAverage_({
                                 conditioning_to: applier.CONDITIONING0,
                                 conditioning_from: conditioning.CONDITIONING0,
                                 conditioning_to_strength: strength,
-                            });
+                            })
 
-                            return averager;
+                            return averager
                         },
-                    });
+                    })
                 }}
             />
             <Stack>
@@ -135,13 +137,13 @@ export const ControlNetClipVision = (props: {
                 />
             </Stack>
         </Stack>
-    );
-};
+    )
+}
 
 export const ImageToImage = (props: { id: number; onChange: (config: any) => void }) => {
-    const [image, setImage] = useState<ComfyFile | undefined>(undefined);
-    const [imageCrop, setImageCrop] = useState(false);
-    const [imageDenoise, setImageDenoise] = useState(0.75);
+    const [image, setImage] = useState<ComfyFile | undefined>(undefined)
+    const [imageCrop, setImageCrop] = useState(false)
+    const [imageDenoise, setImageDenoise] = useState(0.75)
 
     useEffect(() => {
         if (image) {
@@ -149,20 +151,20 @@ export const ImageToImage = (props: { id: number; onChange: (config: any) => voi
                 type: "config",
                 id: props.id,
                 apply: (config) => {
-                    config.image = image;
-                    config.imageCrop = imageCrop;
-                    config.imageDenoise = imageDenoise;
+                    config.image = image
+                    config.imageCrop = imageCrop
+                    config.imageDenoise = imageDenoise
                 },
-            });
+            })
         }
-    }, [image, imageCrop, imageDenoise]);
+    }, [image, imageCrop, imageDenoise])
 
     return (
         <Stack>
             <Typography>img2img</Typography>
             <ImageUploadZone
                 onChange={(file) => {
-                    setImage(file);
+                    setImage(file)
                 }}
             />
             <Stack>
@@ -177,5 +179,5 @@ export const ImageToImage = (props: { id: number; onChange: (config: any) => voi
                 <LabeledCheckbox value={imageCrop} onChange={setImageCrop} label="Crop Image" />
             </Stack>
         </Stack>
-    );
-};
+    )
+}

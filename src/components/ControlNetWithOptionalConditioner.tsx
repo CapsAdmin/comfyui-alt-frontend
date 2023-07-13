@@ -1,104 +1,103 @@
-import { Stack, Typography } from "@mui/material";
-import { LabeledSlider } from "./LabeledSlider";
+import { Stack, Typography } from "@mui/material"
+import { LabeledSlider } from "./LabeledSlider"
 
-import { useEffect, useRef, useState } from "react";
-import { ComfyResources, api } from "../Api/Api";
+import { useEffect, useRef, useState } from "react"
+import { ComfyResources, api } from "../Api/Api"
 import {
     BuildWorkflow,
     ControlNetApply,
     ControlNetLoader,
     LoadImage,
-    PreviewImage
-} from "../Api/Nodes";
-import { ImageUploadZone } from "./ImageUploadZone";
-import { LabeledCheckbox } from "./LabeledCheckbox";
+    PreviewImage,
+} from "../Api/Nodes"
+import { ImageUploadZone } from "./ImageUploadZone"
+import { LabeledCheckbox } from "./LabeledCheckbox"
 
 export type ControlNetConditioner =
     | {
-          type: "conditioner";
-          id: number;
+          type: "conditioner"
+          id: number
           apply: (
               conditioning: { CONDITIONING0: any },
               resources: ComfyResources
-          ) => { CONDITIONING0: any };
+          ) => { CONDITIONING0: any }
       }
     | {
-          type: "config";
-          id: number;
-          apply: (config: any, resources: ComfyResources) => void;
-      };
+          type: "config"
+          id: number
+          apply: (config: any, resources: ComfyResources) => void
+      }
 
-
-let timerId: number;
+let timerId: number
 
 export type PropConfig =
     | {
-          type: "number";
-          min: number;
-          max: number;
-          step: number;
-          value: number;
+          type: "number"
+          min: number
+          max: number
+          step: number
+          value: number
       }
     | {
-          type: "boolean";
-          _true: any;
-          _false: any;
-          value: any;
-      };
+          type: "boolean"
+          _true: any
+          _false: any
+          value: any
+      }
 
 export const ControlNetWithOptionalPreprocessor = (props: {
-    id: number;
-    title: string;
-    checkpoint: string;
-    propConfig?: { [key: string]: PropConfig };
-    preprocessor: (input: any) => { IMAGE0: any };
-    onChange: (conditioning: ControlNetConditioner) => void;
+    id: number
+    title: string
+    checkpoint: string
+    propConfig?: { [key: string]: PropConfig }
+    preprocessor: (input: any) => { IMAGE0: any }
+    onChange: (conditioning: ControlNetConditioner) => void
 }) => {
-    const checkPoint = props.checkpoint;
-    const PreProcessor = props.preprocessor;
-    const [config, setConfig] = useState(props.propConfig || {});
+    const checkPoint = props.checkpoint
+    const PreProcessor = props.preprocessor
+    const [config, setConfig] = useState(props.propConfig || {})
 
     const runPreProcessor = (image: any) => {
         if (!preProcess) {
-            return image;
+            return image
         }
 
-        type Key = keyof typeof config;
+        type Key = keyof typeof config
 
-        const key_values = {} as { [key in Key]: any };
+        const key_values = {} as { [key in Key]: any }
 
         for (const key in config) {
-            const value = config[key as Key];
-            key_values[key as Key] = value.value;
+            const value = config[key as Key]
+            key_values[key as Key] = value.value
         }
 
         return PreProcessor({
             image: image.IMAGE0,
             ...key_values,
-        });
-    };
+        })
+    }
 
-    const [strength, setStrength] = useState(1);
-    const [preProcess, setPreProcess] = useState(true);
+    const [strength, setStrength] = useState(1)
+    const [preProcess, setPreProcess] = useState(true)
 
     // eslint-disable-next-line @typescript-eslint/no-empty-function
-    const refreshOverlay = useRef<() => void>(() => {});
+    const refreshOverlay = useRef<() => void>(() => {})
 
     useEffect(() => {
         if (timerId) {
-            clearTimeout(timerId);
+            clearTimeout(timerId)
         }
         timerId = setTimeout(() => {
-            refreshOverlay.current();
-        }, 250);
+            refreshOverlay.current()
+        }, 250)
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [JSON.stringify(config), preProcess]);
+    }, [JSON.stringify(config), preProcess])
 
     useEffect(() => {
         if (!preProcess) {
-            refreshOverlay.current();
+            refreshOverlay.current()
         }
-    }, [preProcess]);
+    }, [preProcess])
 
     return (
         <Stack>
@@ -111,17 +110,17 @@ export const ControlNetWithOptionalPreprocessor = (props: {
                         BuildWorkflow(() => {
                             const image = LoadImage({
                                 image: file.name,
-                            });
+                            })
 
-                            const processor = runPreProcessor(image);
+                            const processor = runPreProcessor(image)
 
                             PreviewImage({
                                 images: processor.IMAGE0,
-                            });
+                            })
                         })
-                    );
+                    )
 
-                    return URL.createObjectURL(await api.view(res.output.images[0]));
+                    return URL.createObjectURL(await api.view(res.output.images[0]))
                 }}
                 onChange={(file) => {
                     props.onChange({
@@ -130,22 +129,22 @@ export const ControlNetWithOptionalPreprocessor = (props: {
                         apply: (conditioning) => {
                             const image = LoadImage({
                                 image: file.name,
-                            });
+                            })
 
                             const model = ControlNetLoader({
                                 control_net_name: checkPoint,
-                            });
+                            })
 
-                            const processor = runPreProcessor(image);
+                            const processor = runPreProcessor(image)
 
                             return ControlNetApply({
                                 control_net: model.CONTROL_NET0,
                                 image: processor.IMAGE0,
                                 strength: strength,
                                 conditioning: conditioning.CONDITIONING0,
-                            });
+                            })
                         },
-                    });
+                    })
                 }}
             />
             <Stack>
@@ -175,7 +174,7 @@ export const ControlNetWithOptionalPreprocessor = (props: {
                                         step={value.step}
                                         label={key}
                                     />
-                                );
+                                )
                             } else if (value.type == "boolean") {
                                 return (
                                     <LabeledCheckbox
@@ -191,12 +190,12 @@ export const ControlNetWithOptionalPreprocessor = (props: {
                                             })
                                         }
                                     />
-                                );
+                                )
                             }
                         })}
                     </>
                 )}
             </Stack>
         </Stack>
-    );
-};
+    )
+}

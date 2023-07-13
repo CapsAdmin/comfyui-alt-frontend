@@ -1,18 +1,18 @@
-import { Ref, useEffect, useState } from "react";
+import { useEffect, useState } from "react"
 
 class ComfyApi extends EventTarget {
-    #registered = new Set();
-    socket?: WebSocket;
-    clientId?: string;
-    host = location.host;
-    protocol = location.protocol;
+    #registered = new Set()
+    socket?: WebSocket
+    clientId?: string
+    host = location.host
+    protocol = location.protocol
 
     constructor() {
-        super();
+        super()
     }
 
     async fetch(input: string, init?: RequestInit) {
-        return await fetch(this.protocol + "://" + this.host + input, init);
+        return await fetch(this.protocol + "://" + this.host + input, init)
     }
 
     addEventListener(
@@ -20,8 +20,8 @@ class ComfyApi extends EventTarget {
         callback: (evt: Event) => void,
         options?: AddEventListenerOptions
     ) {
-        super.addEventListener(type, callback, options);
-        this.#registered.add(type);
+        super.addEventListener(type, callback, options)
+        this.#registered.add(type)
     }
 
     /**
@@ -30,13 +30,13 @@ class ComfyApi extends EventTarget {
     #pollQueue() {
         setInterval(async () => {
             try {
-                const resp = await this.fetch("/prompt");
-                const status = (await resp.json()) as string;
-                this.dispatchEvent(new CustomEvent("status", { detail: status }));
+                const resp = await this.fetch("/prompt")
+                const status = (await resp.json()) as string
+                this.dispatchEvent(new CustomEvent("status", { detail: status }))
             } catch (error) {
-                this.dispatchEvent(new CustomEvent("status", { detail: null }));
+                this.dispatchEvent(new CustomEvent("status", { detail: null }))
             }
-        }, 1000);
+        }, 1000)
     }
 
     /**
@@ -45,160 +45,158 @@ class ComfyApi extends EventTarget {
      */
     #createSocket(isReconnect?: boolean) {
         if (this.socket) {
-            return;
+            return
         }
 
-        let opened = false;
-        let existingSession = window.name;
+        let opened = false
+        let existingSession = window.name
         if (existingSession) {
-            existingSession = "?clientId=" + existingSession;
+            existingSession = "?clientId=" + existingSession
         }
         this.socket = new WebSocket(
             `ws${this.protocol === "https:" ? "s" : ""}://${this.host}/ws${existingSession}`
-        );
-        this.socket.binaryType = "arraybuffer";
+        )
+        this.socket.binaryType = "arraybuffer"
 
         this.socket.addEventListener("open", () => {
-            opened = true;
+            opened = true
             if (isReconnect) {
-                this.dispatchEvent(new CustomEvent("reconnected"));
+                this.dispatchEvent(new CustomEvent("reconnected"))
             }
-        });
+        })
 
         this.socket.addEventListener("error", () => {
-            if (this.socket) this.socket.close();
+            if (this.socket) this.socket.close()
             if (!isReconnect && !opened) {
-                this.#pollQueue();
+                this.#pollQueue()
             }
-        });
+        })
 
         this.socket.addEventListener("close", () => {
             setTimeout(() => {
-                this.socket = undefined;
-                this.#createSocket(true);
-            }, 300);
+                this.socket = undefined
+                this.#createSocket(true)
+            }, 300)
             if (opened) {
-                this.dispatchEvent(new CustomEvent("status", { detail: null }));
-                this.dispatchEvent(new CustomEvent("reconnecting"));
+                this.dispatchEvent(new CustomEvent("status", { detail: null }))
+                this.dispatchEvent(new CustomEvent("reconnecting"))
             }
-        });
+        })
 
         this.socket.addEventListener("message", (event: MessageEvent<any>) => {
             try {
                 if (event.data instanceof ArrayBuffer) {
-                    const view = new DataView(event.data);
-                    const eventType = view.getUint32(0);
-                    const buffer = event.data.slice(4);
+                    const view = new DataView(event.data)
+                    const eventType = view.getUint32(0)
+                    const buffer = event.data.slice(4)
                     switch (eventType) {
                         case 1:
-                            const view2 = new DataView(event.data);
-                            const imageType = view2.getUint32(0);
-                            let imageMime;
+                            const view2 = new DataView(event.data)
+                            const imageType = view2.getUint32(0)
+                            let imageMime
                             switch (imageType) {
                                 case 1:
                                 default:
-                                    imageMime = "image/jpeg";
-                                    break;
+                                    imageMime = "image/jpeg"
+                                    break
                                 case 2:
-                                    imageMime = "image/png";
+                                    imageMime = "image/png"
                             }
-                            const imageBlob = new Blob([buffer.slice(4)], { type: imageMime });
-                            this.dispatchEvent(new CustomEvent("b_preview", { detail: imageBlob }));
-                            break;
+                            const imageBlob = new Blob([buffer.slice(4)], { type: imageMime })
+                            this.dispatchEvent(new CustomEvent("b_preview", { detail: imageBlob }))
+                            break
                         default:
-                            throw new Error(
-                                `Unknown binary websocket message of type ${eventType}`
-                            );
+                            throw new Error(`Unknown binary websocket message of type ${eventType}`)
                     }
                 } else {
                     const msg = JSON.parse(event.data) as
                         | {
-                            type: "status";
-                            data: { sid?: string; status: string };
-                        }
+                              type: "status"
+                              data: { sid?: string; status: string }
+                          }
                         | {
-                            type: "progress";
-                            data: any;
-                        }
+                              type: "progress"
+                              data: any
+                          }
                         | {
-                            type: "executing";
-                            data: { node: any };
-                        }
+                              type: "executing"
+                              data: { node: any }
+                          }
                         | {
-                            type: "executed";
-                            data: any;
-                        }
+                              type: "executed"
+                              data: any
+                          }
                         | {
-                            type: "execution_start";
-                            data: any;
-                        }
+                              type: "execution_start"
+                              data: any
+                          }
                         | {
-                            type: "execution_cached";
-                            data: any;
-                        }
+                              type: "execution_cached"
+                              data: any
+                          }
                         | {
-                            type: "execution_error";
-                            data: any;
-                        };
+                              type: "execution_error"
+                              data: any
+                          }
 
                     switch (msg.type) {
                         case "status":
                             if (msg.data.sid) {
-                                this.clientId = msg.data.sid;
-                                window.name = this.clientId;
+                                this.clientId = msg.data.sid
+                                window.name = this.clientId
                             }
                             this.dispatchEvent(
                                 new CustomEvent("status", { detail: msg.data.status })
-                            );
-                            break;
+                            )
+                            break
                         case "progress":
-                            this.dispatchEvent(new CustomEvent("progress", { detail: msg.data }));
-                            break;
+                            this.dispatchEvent(new CustomEvent("progress", { detail: msg.data }))
+                            break
                         case "executing":
                             this.dispatchEvent(
                                 new CustomEvent("executing", { detail: msg.data.node })
-                            );
-                            break;
+                            )
+                            break
                         case "executed":
-                            this.dispatchEvent(new CustomEvent("executed", { detail: msg.data }));
-                            break;
+                            this.dispatchEvent(new CustomEvent("executed", { detail: msg.data }))
+                            break
                         case "execution_start":
                             this.dispatchEvent(
                                 new CustomEvent("execution_start", { detail: msg.data })
-                            );
-                            break;
+                            )
+                            break
                         case "execution_error":
                             this.dispatchEvent(
                                 new CustomEvent("execution_error", { detail: msg.data })
-                            );
-                            break;
+                            )
+                            break
                         case "execution_cached":
                             this.dispatchEvent(
                                 new CustomEvent("execution_cached", { detail: msg.data })
-                            );
-                            break;
+                            )
+                            break
                         default:
-                            const umsg = msg as { type: string; data: any };
+                            const umsg = msg as { type: string; data: any }
                             if (this.#registered.has(umsg.type)) {
                                 this.dispatchEvent(
                                     new CustomEvent(umsg.type, { detail: umsg.data })
-                                );
+                                )
                             } else {
-                                throw new Error(`Unknown message type ${umsg.type}`);
+                                throw new Error(`Unknown message type ${umsg.type}`)
                             }
                     }
                 }
             } catch (error) {
-                console.warn("Unhandled message:", event.data, error);
+                console.warn("Unhandled message:", event.data, error)
             }
-        });
+        })
     }
 
     /**
      * Initialises sockets and realtime updates
      */
     init() {
-        this.#createSocket();
+        this.#createSocket()
     }
 
     /**
@@ -206,8 +204,8 @@ class ComfyApi extends EventTarget {
      * @returns An array of script urls to import
      */
     async getExtensions() {
-        const resp = await this.fetch("/extensions", { cache: "no-store" });
-        return (await resp.json()) as Array<any>;
+        const resp = await this.fetch("/extensions", { cache: "no-store" })
+        return (await resp.json()) as Array<any>
     }
 
     /**
@@ -215,8 +213,8 @@ class ComfyApi extends EventTarget {
      * @returns An array of script urls to import
      */
     async getEmbeddings() {
-        const resp = await this.fetch("/embeddings", { cache: "no-store" });
-        return await resp.json();
+        const resp = await this.fetch("/embeddings", { cache: "no-store" })
+        return await resp.json()
     }
 
     /**
@@ -224,25 +222,25 @@ class ComfyApi extends EventTarget {
      * @returns The node definitions
      */
     async getNodeDefs() {
-        const resp = await this.fetch("/object_info", { cache: "no-store" });
-        return await resp.json();
+        const resp = await this.fetch("/object_info", { cache: "no-store" })
+        return await resp.json()
     }
 
     async view(req: {
-        filename: string;
-        type?: string;
-        subfolder?: string;
-        channel?: string;
-        preview?: string;
+        filename: string
+        type?: string
+        subfolder?: string
+        channel?: string
+        preview?: string
     }) {
-        const query = new URLSearchParams(req as any);
-        const resp = await this.fetch("/view" + "?" + query.toString(), { cache: "no-store" });
-        return await resp.blob();
+        const query = new URLSearchParams(req as any)
+        const resp = await this.fetch("/view" + "?" + query.toString(), { cache: "no-store" })
+        return await resp.blob()
     }
 
     async getNodes() {
-        const resp = await this.fetch("/object_info", { cache: "no-store" });
-        return await resp.json();
+        const resp = await this.fetch("/object_info", { cache: "no-store" })
+        return await resp.json()
     }
 
     /**
@@ -252,21 +250,21 @@ class ComfyApi extends EventTarget {
      */
     async queuePrompt(number: number, prompt: any) {
         const body: {
-            client_id?: string;
-            prompt: string;
-            extra_data: { extra_pnginfo: { workflow: string } };
-            front?: boolean;
-            number?: number;
+            client_id?: string
+            prompt: string
+            extra_data: { extra_pnginfo: { workflow: string } }
+            front?: boolean
+            number?: number
         } = {
             client_id: this.clientId,
             prompt: prompt.output,
             extra_data: { extra_pnginfo: { workflow: prompt.workflow } },
-        };
+        }
 
         if (number === -1) {
-            body.front = true;
+            body.front = true
         } else if (number != 0) {
-            body.number = number;
+            body.number = number
         }
 
         const res = await this.fetch("/prompt", {
@@ -275,18 +273,18 @@ class ComfyApi extends EventTarget {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify(body),
-        });
+        })
 
         if (res.status !== 200) {
             throw {
                 response: await res.json(),
-            };
+            }
         }
 
-        return (await res.json()) as { prompt_id: string; number: number };
+        return (await res.json()) as { prompt_id: string; number: number }
     }
 
-    awaitingPrompts = new Map<string, any>();
+    awaitingPrompts = new Map<string, any>()
 
     async executePrompt(
         number: number,
@@ -294,41 +292,41 @@ class ComfyApi extends EventTarget {
         onPreviewImage?: (img: string) => void,
         onProgress?: (prog: number, max: number) => void
     ): Promise<{
-        node: string;
+        node: string
         output: {
             images: Array<{
-                filename: string;
-                subfolder: string;
-                type: string;
-            }>;
-        };
-        prompt_id: string;
+                filename: string
+                subfolder: string
+                type: string
+            }>
+        }
+        prompt_id: string
     }> {
         const progress = (data: any) => {
-            const progress = data.detail.value as number;
-            const max = data.detail.max as number;
-            if (onProgress) onProgress(progress, max);
-        };
+            const progress = data.detail.value as number
+            const max = data.detail.max as number
+            if (onProgress) onProgress(progress, max)
+        }
 
         const b_preview = (data: any) => {
-            if (onPreviewImage) onPreviewImage(URL.createObjectURL(data.detail as Blob));
-        };
+            if (onPreviewImage) onPreviewImage(URL.createObjectURL(data.detail as Blob))
+        }
 
-        this.addEventListener("progress", progress);
-        this.addEventListener("b_preview", b_preview);
+        this.addEventListener("progress", progress)
+        this.addEventListener("b_preview", b_preview)
 
-        const res = await this.queuePrompt(number, prompt);
+        const res = await this.queuePrompt(number, prompt)
         return new Promise((resolve, reject) => {
             const executed = (event: any) => {
                 if (event.detail.prompt_id === res.prompt_id) {
-                    this.removeEventListener("executed", executed);
-                    this.removeEventListener("progress", progress);
-                    this.removeEventListener("b_preview", b_preview);
-                    resolve(event.detail);
+                    this.removeEventListener("executed", executed)
+                    this.removeEventListener("progress", progress)
+                    this.removeEventListener("b_preview", b_preview)
+                    resolve(event.detail)
                 }
-            };
-            this.addEventListener("executed", executed);
-        });
+            }
+            this.addEventListener("executed", executed)
+        })
     }
 
     /**
@@ -338,9 +336,9 @@ class ComfyApi extends EventTarget {
      */
     async getItems(type: string) {
         if (type === "queue") {
-            return this.getQueue();
+            return this.getQueue()
         }
-        return this.getHistory();
+        return this.getHistory()
     }
 
     /**
@@ -349,11 +347,11 @@ class ComfyApi extends EventTarget {
      */
     async getQueue() {
         try {
-            const res = await this.fetch("/queue");
+            const res = await this.fetch("/queue")
             const data = (await res.json()) as {
-                queue_running: Array<string>;
-                queue_pending: Array<string>;
-            };
+                queue_running: Array<string>
+                queue_pending: Array<string>
+            }
             return {
                 // Running action uses a different endpoint for cancelling
                 Running: data.queue_running.map((prompt) => ({
@@ -361,10 +359,10 @@ class ComfyApi extends EventTarget {
                     remove: { name: "Cancel", cb: () => api.interrupt() },
                 })),
                 Pending: data.queue_pending.map((prompt) => ({ prompt })),
-            };
+            }
         } catch (error) {
-            console.error(error);
-            return { Running: [], Pending: [] };
+            console.error(error)
+            return { Running: [], Pending: [] }
         }
     }
 
@@ -374,11 +372,11 @@ class ComfyApi extends EventTarget {
      */
     async getHistory() {
         try {
-            const res = await this.fetch("/history");
-            return { History: Object.values(await res.json()) };
+            const res = await this.fetch("/history")
+            return { History: Object.values(await res.json()) }
         } catch (error) {
-            console.error(error);
-            return { History: [] };
+            console.error(error)
+            return { History: [] }
         }
     }
 
@@ -395,9 +393,9 @@ class ComfyApi extends EventTarget {
                     "Content-Type": "application/json",
                 },
                 body: body ? JSON.stringify(body) : undefined,
-            });
+            })
         } catch (error) {
-            console.error(error);
+            console.error(error)
         }
     }
 
@@ -407,7 +405,7 @@ class ComfyApi extends EventTarget {
      * @param {number} id The id of the item to delete
      */
     async deleteItem(type: string, id: number) {
-        await this.#postItem(type, { delete: [id] });
+        await this.#postItem(type, { delete: [id] })
     }
 
     /**
@@ -415,52 +413,52 @@ class ComfyApi extends EventTarget {
      * @param {string} type The type of list to clear, queue or history
      */
     async clearItems(type: string) {
-        await this.#postItem(type, { clear: true });
+        await this.#postItem(type, { clear: true })
     }
 
     /**
      * Interrupts the execution of the running prompt
      */
     async interrupt() {
-        await this.#postItem("interrupt", null);
+        await this.#postItem("interrupt", null)
     }
 
     async uploadFile(file: File) {
         try {
-            const body = new FormData();
-            body.append("image", file);
-            body.append("overwrite", "true");
+            const body = new FormData()
+            body.append("image", file)
+            body.append("overwrite", "true")
             const resp = await this.fetch("/upload/image", {
                 method: "POST",
                 body,
-            });
+            })
             if (resp.status === 200) {
-                const data = await resp.json();
+                const data = await resp.json()
 
-                return data;
+                return data
             } else {
-                alert(resp.status + " - " + resp.statusText);
+                alert(resp.status + " - " + resp.statusText)
             }
         } catch (error) {
-            alert(error);
+            alert(error)
         }
     }
 }
 
-export const api = new ComfyApi();
+export const api = new ComfyApi()
 
-api.protocol = "http";
-api.host = "127.0.0.1:8188";
-api.init();
+api.protocol = "http"
+api.host = "127.0.0.1:8188"
+api.init()
 export interface ComfyResources {
-    checkpoints: string[];
-    embeddings: string[];
-    hypernetworks: string[];
-    loras: string[];
-    controlnets: string[];
-    samplingMethods: string[];
-    samplingSchedulers: string[];
-    nodes: { [key: string]: ComfyNodeDef };
+    checkpoints: string[]
+    embeddings: string[]
+    hypernetworks: string[]
+    loras: string[]
+    controlnets: string[]
+    samplingMethods: string[]
+    samplingSchedulers: string[]
+    nodes: { [key: string]: ComfyNodeDef }
 }
 
 export const useComfyAPI = () => {
@@ -473,18 +471,18 @@ export const useComfyAPI = () => {
         samplingMethods: [],
         samplingSchedulers: [],
         nodes: {},
-    });
+    })
 
     useEffect(() => {
-        (async () => {
-            const nodes = await api.getNodes();
-            const embeddings = await api.getEmbeddings();
-            const checkpoints = nodes.CheckpointLoaderSimple.input.required.ckpt_name[0];
-            const samplingMethods = nodes.KSamplerAdvanced.input.required.sampler_name[0];
-            const samplingSchedulers = nodes.KSamplerAdvanced.input.required.scheduler[0];
-            const loras = nodes.LoraLoader.input.required.lora_name[0];
-            const hypernetworks = nodes.HypernetworkLoader.input.required.hypernetwork_name[0];
-            const controlnets = nodes.ControlNetLoader.input.required.control_net_name[0];
+        ;(async () => {
+            const nodes = await api.getNodes()
+            const embeddings = await api.getEmbeddings()
+            const checkpoints = nodes.CheckpointLoaderSimple.input.required.ckpt_name[0]
+            const samplingMethods = nodes.KSamplerAdvanced.input.required.sampler_name[0]
+            const samplingSchedulers = nodes.KSamplerAdvanced.input.required.scheduler[0]
+            const loras = nodes.LoraLoader.input.required.lora_name[0]
+            const hypernetworks = nodes.HypernetworkLoader.input.required.hypernetwork_name[0]
+            const controlnets = nodes.ControlNetLoader.input.required.control_net_name[0]
 
             setResources({
                 nodes,
@@ -495,59 +493,58 @@ export const useComfyAPI = () => {
                 controlnets,
                 samplingMethods,
                 samplingSchedulers,
-            });
-        })();
-    }, []);
+            })
+        })()
+    }, [])
 
-    return resources;
-};
+    return resources
+}
 
 export type ComfyNodeDef = {
-    name: string;
-    display_name?: string;
-    category: string;
-    output_node?: boolean;
-    input: ComfyNodeDefInputs;
+    name: string
+    display_name?: string
+    category: string
+    output_node?: boolean
+    input: ComfyNodeDefInputs
     /** Output type like "LATENT" or "IMAGE" */
-    output: string[];
-    output_name: string[];
-    output_is_list: boolean[];
-};
+    output: string[]
+    output_name: string[]
+    output_is_list: boolean[]
+}
 
 export type ComfyNodeDefInputs = {
-    required: Record<string, ComfyNodeDefInput>;
-    optional?: Record<string, ComfyNodeDefInput>;
-};
-export type ComfyNodeDefInput = [ComfyNodeDefInputType, ComfyNodeDefInputOptions | null];
+    required: Record<string, ComfyNodeDefInput>
+    optional?: Record<string, ComfyNodeDefInput>
+}
+export type ComfyNodeDefInput = [ComfyNodeDefInputType, ComfyNodeDefInputOptions | null]
 
 /**
  * - Array: Combo widget. Usually the values are strings but they can also be other stuff like booleans.
  * - "INT"/"FLOAT"/etc.: Non-combo type widgets. See ComfyWidgets type.
  * - other string: Must be a backend input type, usually something lke "IMAGE" or "LATENT".
  */
-export type ComfyNodeDefInputType = any[] | string;
+export type ComfyNodeDefInputType = any[] | string
 
 export type ComfyNodeDefInputOptions = {
-    forceInput?: boolean;
+    forceInput?: boolean
 
     // NOTE: For COMBO type inputs, the default value is always the first entry in the list.
-    default?: any;
+    default?: any
 
     // INT/FLOAT options
-    min?: number;
-    max?: number;
-    step?: number;
+    min?: number
+    max?: number
+    step?: number
 
     // STRING options
-    multiline?: boolean;
-};
+    multiline?: boolean
+}
 
 // TODO if/when comfy refactors
 export type ComfyNodeDefOutput = {
-    type: string;
-    name: string;
-    is_list?: boolean;
-};
+    type: string
+    name: string
+    is_list?: boolean
+}
 
-
-export type ComfyFile = { name: string; subfolder: string; type: string };
+export type ComfyFile = { name: string; subfolder: string; type: string }

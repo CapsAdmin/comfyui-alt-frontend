@@ -1,10 +1,10 @@
-import { Checkbox, Stack } from "@mui/material";
-import Typography from "@mui/material/Typography";
+import { Checkbox, Stack } from "@mui/material"
+import Typography from "@mui/material/Typography"
 
 export function LabeledCheckbox(props: {
-    value: boolean;
-    onChange: (v: boolean) => void;
-    label: string;
+    value: boolean
+    onChange: (v: boolean) => void
+    label: string
 }) {
     return (
         <Stack direction={"row"} alignItems={"center"} flex={1}>
@@ -13,5 +13,5 @@ export function LabeledCheckbox(props: {
             </Typography>
             <Checkbox checked={props.value} onChange={(e) => props.onChange(e.target.checked)} />
         </Stack>
-    );
+    )
 }

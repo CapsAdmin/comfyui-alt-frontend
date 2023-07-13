@@ -1,57 +1,57 @@
-import { Box, Typography } from "@mui/material";
+import { Box, Typography } from "@mui/material"
 
-import { MutableRefObject, RefObject, useCallback, useEffect, useRef, useState } from "react";
-import { useDropzone } from "react-dropzone";
-import { ComfyFile, api } from "../Api/Api";
+import { MutableRefObject, useCallback, useEffect, useRef, useState } from "react"
+import { useDropzone } from "react-dropzone"
+import { ComfyFile, api } from "../Api/Api"
 
 export const ImageUploadZone = (props: {
-    onChange: (image: ComfyFile) => void;
-    getOverlayImage?: (image: ComfyFile) => Promise<string>;
-    refreshOverlay?: MutableRefObject<() => void>;
+    onChange: (image: ComfyFile) => void
+    getOverlayImage?: (image: ComfyFile) => Promise<string>
+    refreshOverlay?: MutableRefObject<() => void>
 }) => {
-    const imageRef = useRef<HTMLImageElement>(null);
-    const overlayImageRef = useRef<HTMLImageElement>(null);
-    const [imageFile, setImageFile] = useState<ComfyFile | undefined>(undefined);
+    const imageRef = useRef<HTMLImageElement>(null)
+    const overlayImageRef = useRef<HTMLImageElement>(null)
+    const [imageFile, setImageFile] = useState<ComfyFile | undefined>(undefined)
 
     if (props.refreshOverlay) {
         props.refreshOverlay.current = async () => {
             if (props.getOverlayImage && imageFile && overlayImageRef.current) {
-                overlayImageRef.current.src = await props.getOverlayImage(imageFile);
-                overlayImageRef.current.style.opacity = "1";
+                overlayImageRef.current.src = await props.getOverlayImage(imageFile)
+                overlayImageRef.current.style.opacity = "1"
             }
-        };
+        }
     }
 
     const onDrop = useCallback(async (files: Array<File>) => {
-        const uploadedResult = await api.uploadFile(files[0]);
-        setImageFile(uploadedResult);
-        const reader = new FileReader();
+        const uploadedResult = await api.uploadFile(files[0])
+        setImageFile(uploadedResult)
+        const reader = new FileReader()
         reader.onload = function (e) {
             if (imageRef.current) {
-                imageRef.current.src = e.target?.result as string;
+                imageRef.current.src = e.target?.result as string
             }
-        };
-        reader.readAsDataURL(files[0]);
+        }
+        reader.readAsDataURL(files[0])
 
         if (props.getOverlayImage) {
             if (props.getOverlayImage && overlayImageRef.current) {
-                overlayImageRef.current.src = await props.getOverlayImage(uploadedResult);
-                overlayImageRef.current.style.opacity = "1";
+                overlayImageRef.current.src = await props.getOverlayImage(uploadedResult)
+                overlayImageRef.current.style.opacity = "1"
             }
         }
-    }, []);
+    }, [])
 
-    const onChange = props.onChange;
+    const onChange = props.onChange
 
     useEffect(() => {
         if (imageFile === undefined) {
-            return;
+            return
         }
-        onChange(imageFile);
-    }, [onChange, imageFile]);
+        onChange(imageFile)
+    }, [onChange, imageFile])
 
-    const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
-    const size = 256;
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop })
+    const size = 256
     return (
         <Box>
             <div
@@ -78,12 +78,12 @@ export const ImageUploadZone = (props: {
                 <img
                     onMouseOver={() => {
                         if (overlayImageRef && overlayImageRef.current) {
-                            overlayImageRef.current.style.opacity = "0";
+                            overlayImageRef.current.style.opacity = "0"
                         }
                     }}
                     onMouseOut={() => {
                         if (overlayImageRef && overlayImageRef.current) {
-                            overlayImageRef.current.style.opacity = "1";
+                            overlayImageRef.current.style.opacity = "1"
                         }
                     }}
                     style={{
@@ -99,5 +99,5 @@ export const ImageUploadZone = (props: {
                 ></img>
             </div>
         </Box>
-    );
-};
+    )
+}

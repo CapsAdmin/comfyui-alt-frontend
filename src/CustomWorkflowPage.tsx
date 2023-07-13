@@ -30,14 +30,7 @@ import {
     VAEDecode,
     VAEEncode,
 } from "./Api/Nodes"
-import {
-    ControlNetCannyEdge,
-    ControlNetClipVision,
-    ControlNetDepth,
-    ControlNetLineArt,
-    ImageToImage,
-} from "./Conditioners"
-import { ControlNetConditioner } from "./components/ControlNetWithOptionalConditioner"
+import { ClipVision } from "./Conditioners"
 import { Generate } from "./components/Generate"
 import { LabeledSlider } from "./components/LabeledSlider"
 import { PreprocessPrompts } from "./utils/prompts"
@@ -67,7 +60,7 @@ const ExecuteCustomWorkflow = (config: {
     imageCrop?: boolean
     imageDenoise?: number
 
-    conditioners: Array<ControlNetConditioner>
+    conditioners: Array<ClipVision>
 }) => {
     return BuildWorkflow(() => {
         if (config.conditioners) {
@@ -178,13 +171,9 @@ const ExecuteCustomWorkflow = (config: {
     })
 }
 
-const availableConditioners = [
-    ControlNetCannyEdge,
-    ControlNetDepth,
-    ControlNetClipVision,
-    ControlNetLineArt,
-    ImageToImage,
-] as const
+type Config = Parameters<typeof ExecuteCustomWorkflow>[0]
+
+const availableConditioners = [ClipVision] as const
 
 function AddConditioner(props: {
     onAdd: (conditioner: (typeof availableConditioners)[number], id: number) => void
@@ -235,36 +224,31 @@ export function CustomWorkflowPage() {
     const [progress, setProgress] = useState(0)
     const [maxProgress, setMaxProgress] = useState(0)
 
-    const [checkpoint, setCheckpoint] = useState("anime/Anything-V3.0-pruned-fp32.ckpt")
-    const [positive, setPositive] = useState("")
-    const [negative, setNegative] = useState("")
+    const [config, setConfig] = useState<Config>({
+        checkpoint: "anime/Anything-V3.0-pruned-fp32.ckpt",
+        positive: "",
+        negative: "",
+        samplingMethod: "euler",
+        samplingScheduler: "normal",
+        samplingSteps: 20,
+        width: 512,
+        height: 512,
+        cfgScale: 7.5,
+        seed: 0,
+        conditioners: [],
+        batchSize: 1,
+        batchCount: 1,
+        resources,
+    })
 
-    const [samplingMethod, setSamplingMethod] = useState("euler")
-    const [samplingScheduler, setSamplingScheduler] = useState("normal")
-    const [samplingSteps, setSamplingSteps] = useState(20)
-
-    const [width, setWidth] = useState(512)
-    const [height, setHeight] = useState(512)
-
-    const [cfgScale, setCfgScale] = useState(7.5)
-    const [seed, setSeed] = useState(0)
-
-    type ActiveConditioner = {
-        name: string
-        id: number
-        Render: (typeof availableConditioners)[number]
-    }
-
-    const [conditioners, setConditioners] = useState<Array<ControlNetConditioner>>([])
-    const [activeConditioners, setActiveConditioners] = useState<Array<ActiveConditioner>>([])
-    const [selectedConditioner, setSelectedConditioner] = useState<ActiveConditioner>()
+    const [selectedConditioner, setSelectedConditioner] = useState<Config["conditioners"][number]>()
 
     return (
         <Stack>
             <Select
                 style={{ flex: 1 }}
-                value={checkpoint}
-                onChange={(e) => setCheckpoint(e.target.value)}
+                value={config.checkpoint}
+                onChange={(e) => setConfig({ ...config, checkpoint: e.target.value })}
             >
                 {resources.checkpoints.map((v) => (
                     <MenuItem key={v} value={v}>
@@ -277,21 +261,21 @@ export function CustomWorkflowPage() {
                 <Stack flex={1}>
                     <TextField
                         label="positive"
-                        value={positive}
-                        onChange={(e) => setPositive(e.target.value)}
+                        value={config.positive}
+                        onChange={(e) => setConfig({ ...config, positive: e.target.value })}
                         multiline
                         minRows={3}
                     />
                     <TextField
                         label="negative"
-                        value={negative}
-                        onChange={(e) => setNegative(e.target.value)}
+                        value={config.negative}
+                        onChange={(e) => setConfig({ ...config, negative: e.target.value })}
                         multiline
                         minRows={3}
                     />
                     <LabeledSlider
-                        value={cfgScale}
-                        onChange={(v) => setCfgScale(v)}
+                        value={config.cfgScale}
+                        onChange={(v) => setConfig({ ...config, cfgScale: v })}
                         min={1}
                         max={30}
                         step={0.5}
@@ -299,7 +283,7 @@ export function CustomWorkflowPage() {
                     />
                     <Stack direction="row">
                         <List>
-                            {activeConditioners.map((obj, i) => (
+                            {config.conditioners.map((obj, i) => (
                                 <ListItem
                                     selected={selectedConditioner?.id === obj.id}
                                     button
@@ -311,17 +295,9 @@ export function CustomWorkflowPage() {
                             ))}
 
                             <AddConditioner
-                                onAdd={(Render) => {
-                                    const active = [...activeConditioners]
-                                    const id = active.length
-                                    const conditioner = {
-                                        id,
-                                        name: Render.name + " " + id,
-                                        Render,
-                                    }
-                                    active.push(conditioner)
-                                    setActiveConditioners(active)
-                                    setSelectedConditioner(conditioner)
+                                onAdd={(obj) => {
+                                    config.conditioners.push(new obj(config.conditioners.length))
+                                    setConfig({ ...config })
                                 }}
                             ></AddConditioner>
                         </List>
@@ -331,41 +307,26 @@ export function CustomWorkflowPage() {
                                     style={{ position: "absolute", right: 0, top: 0 }}
                                     size="small"
                                     onClick={() => {
-                                        const newActiveConditioners = [
-                                            ...activeConditioners.filter(
-                                                (c) => c.id !== selectedConditioner.id
-                                            ),
-                                        ]
-                                        setActiveConditioners(newActiveConditioners)
-
-                                        setConditioners([
-                                            ...conditioners.filter(
-                                                (c) => c.id !== selectedConditioner.id
-                                            ),
-                                        ])
-
-                                        setSelectedConditioner(newActiveConditioners[0])
+                                        config.conditioners = config.conditioners.filter(
+                                            (c) => c.id !== selectedConditioner.id
+                                        )
+                                        setConfig({ ...config })
+                                        setSelectedConditioner(config.conditioners[0])
                                     }}
                                 >
                                     <Delete></Delete>
                                 </Fab>
 
-                                <selectedConditioner.Render
-                                    id={selectedConditioner.id}
-                                    onChange={(conditioner: ControlNetConditioner) => {
-                                        // replace or push conditioner
-
-                                        const index = conditioners.findIndex(
+                                <selectedConditioner.render
+                                    value={selectedConditioner.config}
+                                    onChange={(v) => {
+                                        const found = config.conditioners.find(
                                             (c) => c.id === selectedConditioner.id
                                         )
-
-                                        if (index === -1) {
-                                            setConditioners([...conditioners, conditioner])
-                                        } else {
-                                            const newConditioners = [...conditioners]
-                                            newConditioners[index] = conditioner
-                                            setConditioners(newConditioners)
+                                        if (found) {
+                                            found.config = v
                                         }
+                                        setConfig({ ...config })
                                     }}
                                 />
                             </Card>
@@ -381,8 +342,10 @@ export function CustomWorkflowPage() {
                             <Stack direction={"row"}>
                                 <Select
                                     style={{ flex: 1 }}
-                                    value={samplingMethod}
-                                    onChange={(e) => setSamplingMethod(e.target.value)}
+                                    value={config.samplingMethod}
+                                    onChange={(e) =>
+                                        setConfig({ ...config, samplingMethod: e.target.value })
+                                    }
                                 >
                                     {resources.samplingMethods.map((v) => (
                                         <MenuItem key={v} value={v}>
@@ -393,8 +356,10 @@ export function CustomWorkflowPage() {
 
                                 <Select
                                     style={{ flex: 1 }}
-                                    value={samplingScheduler}
-                                    onChange={(e) => setSamplingScheduler(e.target.value)}
+                                    value={config.samplingScheduler}
+                                    onChange={(e) =>
+                                        setConfig({ ...config, samplingScheduler: e.target.value })
+                                    }
                                 >
                                     {resources.samplingSchedulers.map((v) => (
                                         <MenuItem key={v} value={v}>
@@ -406,8 +371,8 @@ export function CustomWorkflowPage() {
                         </Stack>
 
                         <LabeledSlider
-                            value={samplingSteps}
-                            onChange={(v) => setSamplingSteps(v)}
+                            value={config.samplingSteps}
+                            onChange={(v) => setConfig({ ...config, samplingSteps: v })}
                             min={0}
                             max={150}
                             step={1}
@@ -415,8 +380,8 @@ export function CustomWorkflowPage() {
                         ></LabeledSlider>
 
                         <LabeledSlider
-                            value={seed}
-                            onChange={setSeed}
+                            value={config.seed}
+                            onChange={(v) => setConfig({ ...config, seed: v })}
                             min={-1}
                             max={10000000000000}
                             step={1}
@@ -424,16 +389,16 @@ export function CustomWorkflowPage() {
                         />
 
                         <LabeledSlider
-                            value={width}
-                            onChange={(v) => setWidth(v)}
+                            value={config.width}
+                            onChange={(v) => setConfig({ ...config, width: v })}
                             min={0}
                             max={2048}
                             step={64}
                             label="Width"
                         />
                         <LabeledSlider
-                            value={height}
-                            onChange={(v) => setHeight(v)}
+                            value={config.height}
+                            onChange={(v) => setConfig({ ...config, height: v })}
                             min={0}
                             max={2048}
                             step={64}
@@ -460,22 +425,7 @@ export function CustomWorkflowPage() {
                         onClick={async () => {
                             const res = await api.executePrompt(
                                 0,
-                                ExecuteCustomWorkflow({
-                                    checkpoint,
-                                    positive,
-                                    negative,
-                                    samplingMethod,
-                                    samplingScheduler,
-                                    samplingSteps,
-                                    width,
-                                    height,
-                                    batchSize: 1,
-                                    batchCount: 1,
-                                    cfgScale,
-                                    seed,
-                                    resources,
-                                    conditioners,
-                                }),
+                                ExecuteCustomWorkflow(config),
                                 (image) => {
                                     if (!imageOutputRef.current) return
                                     imageOutputRef.current.src = image

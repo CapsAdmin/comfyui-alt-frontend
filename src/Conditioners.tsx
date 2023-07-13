@@ -1,8 +1,7 @@
 import { Stack, Typography } from "@mui/material"
 import { LabeledSlider } from "./components/LabeledSlider"
 
-import { useEffect, useState } from "react"
-import { ComfyFile } from "./Api/Api"
+import { ComfyFile, ComfyResources } from "./Api/Api"
 import {
     CLIPVisionEncode,
     CLIPVisionLoader,
@@ -77,67 +76,78 @@ export const ControlNetDepth = (props: {
     />
 )
 
-export const ControlNetClipVision = (props: {
+export class ClipVision {
+    name = "clip vision"
+    type = "conditioner"
+
     id: number
-    onChange: (conditioning: ControlNetConditioner) => void
-}) => {
-    const [strength, setStrength] = useState(1)
 
-    return (
-        <Stack>
-            <Typography>Clip Vision</Typography>
-            <ImageUploadZone
-                onChange={(file) => {
-                    props.onChange({
-                        type: "conditioner",
-                        id: props.id,
-                        apply: (conditioning) => {
-                            const image = LoadImage({
-                                image: file.name,
-                            })
+    constructor(id: number) {
+        this.id = id
+    }
 
-                            const clipVisionModel = CLIPVisionLoader({
-                                clip_name: "clip-vit-large-patch14.bin",
-                            })
+    config = {
+        strength: 0.75,
+        image: undefined as ComfyFile | undefined,
+    }
 
-                            const styleModel = StyleModelLoader({
-                                style_model_name: "t2iadapter_style_sd14v1.pth",
-                            })
+    apply(conditioning: { CONDITIONING0: any }, resources: ComfyResources) {
+        const image = LoadImage({
+            image: this.config.image!.name,
+        })
 
-                            const clipVisionEncoder = CLIPVisionEncode({
-                                image: image.IMAGE0,
-                                clip_vision: clipVisionModel.CLIP_VISION0,
-                            })
+        const clipVisionModel = CLIPVisionLoader({
+            clip_name: "clip-vit-large-patch14.bin",
+        })
 
-                            const applier = StyleModelApply({
-                                style_model: styleModel.STYLE_MODEL0,
-                                clip_vision_output: clipVisionEncoder.CLIP_VISION_OUTPUT0,
-                                conditioning: conditioning.CONDITIONING0,
-                            })
+        const styleModel = StyleModelLoader({
+            style_model_name: "t2iadapter_style_sd14v1.pth",
+        })
 
-                            const averager = ConditioningAverage_({
-                                conditioning_to: applier.CONDITIONING0,
-                                conditioning_from: conditioning.CONDITIONING0,
-                                conditioning_to_strength: strength,
-                            })
+        const clipVisionEncoder = CLIPVisionEncode({
+            image: image.IMAGE0,
+            clip_vision: clipVisionModel.CLIP_VISION0,
+        })
 
-                            return averager
-                        },
-                    })
-                }}
-            />
+        const applier = StyleModelApply({
+            style_model: styleModel.STYLE_MODEL0,
+            clip_vision_output: clipVisionEncoder.CLIP_VISION_OUTPUT0,
+            conditioning: conditioning.CONDITIONING0,
+        })
+
+        const averager = ConditioningAverage_({
+            conditioning_to: applier.CONDITIONING0,
+            conditioning_from: conditioning.CONDITIONING0,
+            conditioning_to_strength: this.config.strength,
+        })
+
+        return averager
+    }
+
+    render = (props: {
+        value: ClipVision["config"]
+        onChange: (value: typeof props.value) => void
+    }) => {
+        return (
             <Stack>
-                <LabeledSlider
-                    value={strength}
-                    onChange={(v) => setStrength(v)}
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    label="Strength"
+                <Typography>Clip Vision</Typography>
+                <ImageUploadZone
+                    value={props.value.image}
+                    onChange={(file) => props.onChange({ ...props.value, image: file })}
                 />
+                <Stack>
+                    <LabeledSlider
+                        value={props.value.strength}
+                        onChange={(v) => props.onChange({ ...props.value, strength: v })}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        label="Strength"
+                    />
+                </Stack>
             </Stack>
-        </Stack>
-    )
+        )
+    }
 }
 
 type Config = {
@@ -147,44 +157,35 @@ type Config = {
 }
 export const ImageToImage = (props: {
     id: number
-    onChange: (config: ControlNetConditioner) => void
+    image?: ComfyFile
+    value: {
+        image: ComfyFile
+        imageCrop: boolean
+        imageDenoise: number
+    }
+    onChange: (config: typeof props.value) => void
 }) => {
-    const [image, setImage] = useState<ComfyFile | undefined>(undefined)
-    const [imageCrop, setImageCrop] = useState(false)
-    const [imageDenoise, setImageDenoise] = useState(0.75)
-
-    useEffect(() => {
-        if (image) {
-            props.onChange({
-                type: "config",
-                id: props.id,
-                apply: (config: Config) => {
-                    config.image = image
-                    config.imageCrop = imageCrop
-                    config.imageDenoise = imageDenoise
-                },
-            })
-        }
-    }, [image, imageCrop, imageDenoise])
-
     return (
         <Stack>
             <Typography>img2img</Typography>
             <ImageUploadZone
-                onChange={(file) => {
-                    setImage(file)
-                }}
+                value={props.value.image}
+                onChange={(file) => props.onChange({ ...props.value, image: file })}
             />
             <Stack>
                 <LabeledSlider
-                    value={imageDenoise}
-                    onChange={setImageDenoise}
+                    value={props.value.imageDenoise}
+                    onChange={(v) => props.onChange({ ...props.value, imageDenoise: v })}
                     min={0}
                     max={1}
                     step={0.001}
                     label="denoise"
                 />
-                <LabeledCheckbox value={imageCrop} onChange={setImageCrop} label="Crop Image" />
+                <LabeledCheckbox
+                    value={props.value.imageCrop}
+                    onChange={(v) => props.onChange({ ...props.value, imageCrop: v })}
+                    label="Crop Image"
+                />
             </Stack>
         </Stack>
     )

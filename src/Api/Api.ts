@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { usePromise } from "../utils/usePromise"
 
 class ComfyApi extends EventTarget {
     #registered = new Set()
@@ -462,42 +462,27 @@ export interface ComfyResources {
 }
 
 export const useComfyAPI = () => {
-    const [resources, setResources] = useState<ComfyResources>({
-        checkpoints: [],
-        embeddings: [],
-        hypernetworks: [],
-        loras: [],
-        controlnets: [],
-        samplingMethods: [],
-        samplingSchedulers: [],
-        nodes: {},
-    })
+    return usePromise(async () => {
+        const nodes = await api.getNodes()
+        const embeddings = await api.getEmbeddings()
+        const checkpoints = nodes.CheckpointLoaderSimple.input.required.ckpt_name[0]
+        const samplingMethods = nodes.KSamplerAdvanced.input.required.sampler_name[0]
+        const samplingSchedulers = nodes.KSamplerAdvanced.input.required.scheduler[0]
+        const loras = nodes.LoraLoader.input.required.lora_name[0]
+        const hypernetworks = nodes.HypernetworkLoader.input.required.hypernetwork_name[0]
+        const controlnets = nodes.ControlNetLoader.input.required.control_net_name[0]
 
-    useEffect(() => {
-        ;(async () => {
-            const nodes = await api.getNodes()
-            const embeddings = await api.getEmbeddings()
-            const checkpoints = nodes.CheckpointLoaderSimple.input.required.ckpt_name[0]
-            const samplingMethods = nodes.KSamplerAdvanced.input.required.sampler_name[0]
-            const samplingSchedulers = nodes.KSamplerAdvanced.input.required.scheduler[0]
-            const loras = nodes.LoraLoader.input.required.lora_name[0]
-            const hypernetworks = nodes.HypernetworkLoader.input.required.hypernetwork_name[0]
-            const controlnets = nodes.ControlNetLoader.input.required.control_net_name[0]
-
-            setResources({
-                nodes,
-                checkpoints,
-                embeddings,
-                hypernetworks,
-                loras,
-                controlnets,
-                samplingMethods,
-                samplingSchedulers,
-            })
-        })()
-    }, [])
-
-    return resources
+        return {
+            nodes,
+            checkpoints,
+            embeddings,
+            hypernetworks,
+            loras,
+            controlnets,
+            samplingMethods,
+            samplingSchedulers,
+        } as ComfyResources
+    }, "comfyresources")
 }
 
 export type ComfyNodeDef = {

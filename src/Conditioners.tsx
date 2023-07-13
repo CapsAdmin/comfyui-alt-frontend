@@ -140,7 +140,15 @@ export const ControlNetClipVision = (props: {
     )
 }
 
-export const ImageToImage = (props: { id: number; onChange: (config: any) => void }) => {
+type Config = {
+    image: ComfyFile
+    imageCrop: boolean
+    imageDenoise: number
+}
+export const ImageToImage = (props: {
+    id: number
+    onChange: (config: ControlNetConditioner) => void
+}) => {
     const [image, setImage] = useState<ComfyFile | undefined>(undefined)
     const [imageCrop, setImageCrop] = useState(false)
     const [imageDenoise, setImageDenoise] = useState(0.75)
@@ -150,7 +158,7 @@ export const ImageToImage = (props: { id: number; onChange: (config: any) => voi
             props.onChange({
                 type: "config",
                 id: props.id,
-                apply: (config) => {
+                apply: (config: Config) => {
                     config.image = image
                     config.imageCrop = imageCrop
                     config.imageDenoise = imageDenoise

@@ -36,10 +36,11 @@ export function LabeledSlider(props: {
     return (
         <Stack flex={1}>
             <Stack direction="row" justifyContent={"space-between"}>
-                <Typography id="input-slider" gutterBottom>
+                <Typography id="input-slider" gutterBottom style={{ flex: 1 }}>
                     {props.label}
                 </Typography>
                 <Input
+                    style={{ width: 120 }}
                     value={props.value}
                     size="small"
                     onChange={handleInputChange}
@@ -47,7 +48,7 @@ export function LabeledSlider(props: {
                         step: props.step,
                         min: props.min,
                         max: props.max,
-                        type: "number",
+                        type: "tel ",
                     }}
                     disableUnderline
                 />

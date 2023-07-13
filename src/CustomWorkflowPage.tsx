@@ -1,5 +1,5 @@
 import { Add, Delete } from "@mui/icons-material"
-import { Box, Card, Fab, Input, Menu, Select, Stack, TextField } from "@mui/material"
+import { Box, Card, Fab, Menu, Select, Stack, TextField, Typography } from "@mui/material"
 import MenuItem from "@mui/material/MenuItem"
 import { MouseEvent, useRef, useState } from "react"
 import { api, useComfyAPI } from "./Api/Api"
@@ -364,34 +364,36 @@ export function CustomWorkflowPage() {
                     }}
                 />
             </Stack>
-
             <Stack direction={"row"}>
                 <Stack flex={1} direction={"column"}>
-                    <Stack direction={"row"}>
-                        <Stack flex={1} direction={"row"}>
-                            <Select
-                                style={{ flex: 1 }}
-                                value={samplingMethod}
-                                onChange={(e) => setSamplingMethod(e.target.value)}
-                            >
-                                {resources.samplingMethods.map((v) => (
-                                    <MenuItem key={v} value={v}>
-                                        {v}
-                                    </MenuItem>
-                                ))}
-                            </Select>
+                    <Stack direction={"column"}>
+                        <Stack direction={"column"}>
+                            <Typography>Sampler</Typography>
+                            <Stack direction={"row"}>
+                                <Select
+                                    style={{ flex: 1 }}
+                                    value={samplingMethod}
+                                    onChange={(e) => setSamplingMethod(e.target.value)}
+                                >
+                                    {resources.samplingMethods.map((v) => (
+                                        <MenuItem key={v} value={v}>
+                                            {v}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
 
-                            <Select
-                                style={{ flex: 1 }}
-                                value={samplingScheduler}
-                                onChange={(e) => setSamplingScheduler(e.target.value)}
-                            >
-                                {resources.samplingSchedulers.map((v) => (
-                                    <MenuItem key={v} value={v}>
-                                        {v}
-                                    </MenuItem>
-                                ))}
-                            </Select>
+                                <Select
+                                    style={{ flex: 1 }}
+                                    value={samplingScheduler}
+                                    onChange={(e) => setSamplingScheduler(e.target.value)}
+                                >
+                                    {resources.samplingSchedulers.map((v) => (
+                                        <MenuItem key={v} value={v}>
+                                            {v}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </Stack>
                         </Stack>
 
                         <LabeledSlider
@@ -402,43 +404,44 @@ export function CustomWorkflowPage() {
                             step={1}
                             label="Sampling Steps"
                         ></LabeledSlider>
-                    </Stack>
 
-                    <Stack direction={"row"}>
-                        <Stack flex={1} direction={"column"}>
-                            <LabeledSlider
-                                value={width}
-                                onChange={(v) => setWidth(v)}
-                                min={0}
-                                max={2048}
-                                step={64}
-                                label="Width"
-                            />
-
-                            <LabeledSlider
-                                value={height}
-                                onChange={(v) => setHeight(v)}
-                                min={0}
-                                max={2048}
-                                step={64}
-                                label="Height"
-                            />
-                        </Stack>
-                    </Stack>
-
-                    <Stack direction={"column"}>
-                        <Input
+                        <LabeledSlider
                             value={seed}
-                            onChange={(e) => setSeed(parseInt(e.target.value))}
-                            type="number"
-                            inputProps={{
-                                min: -1,
-                                max: 10000000000000,
-                            }}
+                            onChange={setSeed}
+                            min={-1}
+                            max={10000000000000}
+                            step={1}
+                            label="Noise Seed"
+                        />
+
+                        <LabeledSlider
+                            value={width}
+                            onChange={(v) => setWidth(v)}
+                            min={0}
+                            max={2048}
+                            step={64}
+                            label="Width"
+                        />
+                        <LabeledSlider
+                            value={height}
+                            onChange={(v) => setHeight(v)}
+                            min={0}
+                            max={2048}
+                            step={64}
+                            label="Height"
                         />
                     </Stack>
                 </Stack>
-                <img style={{ flex: 1 }} ref={imgRef}></img>
+                <Box flex={1} display={"flex"}>
+                    <img
+                        ref={imgRef}
+                        style={{
+                            flex: 1,
+                            marginLeft: "auto",
+                            marginRight: "auto",
+                        }}
+                    />
+                </Box>
             </Stack>
         </Stack>
     )

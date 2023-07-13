@@ -2,7 +2,7 @@ import Box from "@mui/material/Box"
 import Tab from "@mui/material/Tab"
 import Tabs from "@mui/material/Tabs"
 import * as React from "react"
-import { CustomWorkflowPage } from "./CustomWorkflow"
+import { CustomWorkflowPage } from "./CustomWorkflowPage"
 
 interface TabPanelProps {
     children?: React.ReactNode

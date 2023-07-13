@@ -3,9 +3,9 @@ import { LabeledSlider } from "./components/LabeledSlider"
 
 import { ComfyFile, ComfyResources } from "./Api/Api"
 import {
+    CannyEdgePreprocessor,
     CLIPVisionEncode,
     CLIPVisionLoader,
-    CannyEdgePreprocessor,
     ConditioningAverage_,
     LineArtPreprocessor,
     LoadImage,
@@ -19,6 +19,7 @@ import {
 } from "./components/ControlNetWithOptionalConditioner"
 import { ImageUploadZone } from "./components/ImageUploadZone"
 import { LabeledCheckbox } from "./components/LabeledCheckbox"
+import { Config } from "./CustomWorkflowPage"
 
 export const ControlNetCannyEdge = (props: {
     id: number
@@ -150,43 +151,55 @@ export class ClipVision {
     }
 }
 
-type Config = {
-    image: ComfyFile
-    imageCrop: boolean
-    imageDenoise: number
-}
-export const ImageToImage = (props: {
+export class ImageToImage {
+    name = "img2img"
+    type = "config"
+
     id: number
-    image?: ComfyFile
-    value: {
-        image: ComfyFile
-        imageCrop: boolean
-        imageDenoise: number
+
+    constructor(id: number) {
+        this.id = id
     }
-    onChange: (config: typeof props.value) => void
-}) => {
-    return (
-        <Stack>
-            <Typography>img2img</Typography>
-            <ImageUploadZone
-                value={props.value.image}
-                onChange={(file) => props.onChange({ ...props.value, image: file })}
-            />
+
+    config = {
+        imageCrop: true,
+        imageDenoise: 0.75,
+        image: undefined as ComfyFile | undefined,
+    }
+
+    apply(config: Config, resources: ComfyResources) {
+        config.image = this.config.image
+        config.imageDenoise = this.config.imageDenoise
+        config.imageCrop = this.config.imageCrop
+    }
+
+    render = (props: {
+        value: ImageToImage["config"]
+        onChange: (value: typeof props.value) => void
+    }) => {
+        return (
             <Stack>
-                <LabeledSlider
-                    value={props.value.imageDenoise}
-                    onChange={(v) => props.onChange({ ...props.value, imageDenoise: v })}
-                    min={0}
-                    max={1}
-                    step={0.001}
-                    label="denoise"
+                <Typography>img2img</Typography>
+                <ImageUploadZone
+                    value={props.value.image}
+                    onChange={(file) => props.onChange({ ...props.value, image: file })}
                 />
-                <LabeledCheckbox
-                    value={props.value.imageCrop}
-                    onChange={(v) => props.onChange({ ...props.value, imageCrop: v })}
-                    label="Crop Image"
-                />
+                <Stack>
+                    <LabeledSlider
+                        value={props.value.imageDenoise}
+                        onChange={(v) => props.onChange({ ...props.value, imageDenoise: v })}
+                        min={0}
+                        max={1}
+                        step={0.001}
+                        label="denoise"
+                    />
+                    <LabeledCheckbox
+                        value={props.value.imageCrop}
+                        onChange={(v) => props.onChange({ ...props.value, imageCrop: v })}
+                        label="Crop Image"
+                    />
+                </Stack>
             </Stack>
-        </Stack>
-    )
+        )
+    }
 }

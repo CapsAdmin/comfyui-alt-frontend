@@ -30,7 +30,7 @@ import {
     VAEDecode,
     VAEEncode,
 } from "./Api/Nodes"
-import { ClipVision } from "./Conditioners"
+import { ClipVision, ImageToImage } from "./Conditioners"
 import { Generate } from "./components/Generate"
 import { LabeledSlider } from "./components/LabeledSlider"
 import { PreprocessPrompts } from "./utils/prompts"
@@ -171,9 +171,9 @@ const ExecuteCustomWorkflow = (config: {
     })
 }
 
-type Config = Parameters<typeof ExecuteCustomWorkflow>[0]
+export type Config = Parameters<typeof ExecuteCustomWorkflow>[0]
 
-const availableConditioners = [ClipVision] as const
+const availableConditioners = [ClipVision, ImageToImage] as const
 
 function AddConditioner(props: {
     onAdd: (conditioner: (typeof availableConditioners)[number], id: number) => void

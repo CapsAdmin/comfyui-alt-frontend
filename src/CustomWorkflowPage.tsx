@@ -1,5 +1,16 @@
 import { Add, Delete } from "@mui/icons-material"
-import { Box, Card, Fab, Menu, Select, Stack, TextField, Typography } from "@mui/material"
+import {
+    Box,
+    Card,
+    Fab,
+    List,
+    ListItem,
+    Menu,
+    Select,
+    Stack,
+    TextField,
+    Typography,
+} from "@mui/material"
 import MenuItem from "@mui/material/MenuItem"
 import { MouseEvent, useRef, useState } from "react"
 import { api, useComfyAPI } from "./Api/Api"
@@ -167,14 +178,17 @@ const ExecuteCustomWorkflow = (config: {
     })
 }
 
-function AddConditioner(props: { onAdd: (conditioner: any) => void }) {
-    const availableConditioners = [
-        ControlNetCannyEdge,
-        ControlNetDepth,
-        ControlNetClipVision,
-        ControlNetLineArt,
-        ImageToImage,
-    ]
+const availableConditioners = [
+    ControlNetCannyEdge,
+    ControlNetDepth,
+    ControlNetClipVision,
+    ControlNetLineArt,
+    ImageToImage,
+] as const
+
+function AddConditioner(props: {
+    onAdd: (conditioner: (typeof availableConditioners)[number], id: number) => void
+}) {
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
     const open = Boolean(anchorEl)
     const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
@@ -198,11 +212,11 @@ function AddConditioner(props: { onAdd: (conditioner: any) => void }) {
                     "aria-labelledby": "basic-button",
                 }}
             >
-                {availableConditioners.map((v) => (
+                {availableConditioners.map((v, i) => (
                     <MenuItem
                         key={v.name}
                         onClick={() => {
-                            props.onAdd(v)
+                            props.onAdd(v, i)
                             handleClose()
                         }}
                     >
@@ -215,7 +229,7 @@ function AddConditioner(props: { onAdd: (conditioner: any) => void }) {
 }
 
 export function CustomWorkflowPage() {
-    const imgRef = useRef<HTMLImageElement>(null)
+    const imageOutputRef = useRef<HTMLImageElement>(null)
     const resources = useComfyAPI()
 
     const [progress, setProgress] = useState(0)
@@ -234,13 +248,16 @@ export function CustomWorkflowPage() {
 
     const [cfgScale, setCfgScale] = useState(7.5)
     const [seed, setSeed] = useState(0)
-    const [conditioners, setConditioners] = useState<Array<ControlNetConditioner>>([])
-    const [activeConditioners, setActiveConditioners] = useState<Array<any>>([])
 
-    const addConditioner = (conditioner: ControlNetConditioner) => {
-        conditioners[conditioner.id] = conditioner
-        setConditioners([...conditioners])
+    type ActiveConditioner = {
+        name: string
+        id: number
+        Render: (typeof availableConditioners)[number]
     }
+
+    const [conditioners, setConditioners] = useState<Array<ControlNetConditioner>>([])
+    const [activeConditioners, setActiveConditioners] = useState<Array<ActiveConditioner>>([])
+    const [selectedConditioner, setSelectedConditioner] = useState<ActiveConditioner>()
 
     return (
         <Stack>
@@ -281,88 +298,80 @@ export function CustomWorkflowPage() {
                         label="CFG Scale"
                     />
                     <Stack direction="row">
-                        {activeConditioners.map((obj, i) => (
+                        <List>
+                            {activeConditioners.map((obj, i) => (
+                                <ListItem
+                                    selected={selectedConditioner?.id === obj.id}
+                                    button
+                                    key={i}
+                                    onClick={() => setSelectedConditioner(obj)}
+                                >
+                                    <Typography>{obj.name}</Typography>
+                                </ListItem>
+                            ))}
+
+                            <AddConditioner
+                                onAdd={(Render) => {
+                                    const active = [...activeConditioners]
+                                    const id = active.length
+                                    const conditioner = {
+                                        id,
+                                        name: Render.name + " " + id,
+                                        Render,
+                                    }
+                                    active.push(conditioner)
+                                    setActiveConditioners(active)
+                                    setSelectedConditioner(conditioner)
+                                }}
+                            ></AddConditioner>
+                        </List>
+                        {selectedConditioner && (
                             <Card style={{ position: "relative" }}>
                                 <Fab
                                     style={{ position: "absolute", right: 0, top: 0 }}
                                     size="small"
                                     onClick={() => {
-                                        // delete
-                                        setActiveConditioners([
-                                            ...activeConditioners.filter((_, j) => j !== i),
+                                        const newActiveConditioners = [
+                                            ...activeConditioners.filter(
+                                                (c) => c.id !== selectedConditioner.id
+                                            ),
+                                        ]
+                                        setActiveConditioners(newActiveConditioners)
+
+                                        setConditioners([
+                                            ...conditioners.filter(
+                                                (c) => c.id !== selectedConditioner.id
+                                            ),
                                         ])
 
-                                        setConditioners([...conditioners.filter((_, j) => j !== i)])
+                                        setSelectedConditioner(newActiveConditioners[0])
                                     }}
                                 >
                                     <Delete></Delete>
                                 </Fab>
 
-                                <obj.Render id={i} onChange={addConditioner} />
+                                <selectedConditioner.Render
+                                    id={selectedConditioner.id}
+                                    onChange={(conditioner: ControlNetConditioner) => {
+                                        // replace or push conditioner
+
+                                        const index = conditioners.findIndex(
+                                            (c) => c.id === selectedConditioner.id
+                                        )
+
+                                        if (index === -1) {
+                                            setConditioners([...conditioners, conditioner])
+                                        } else {
+                                            const newConditioners = [...conditioners]
+                                            newConditioners[index] = conditioner
+                                            setConditioners(newConditioners)
+                                        }
+                                    }}
+                                />
                             </Card>
-                        ))}
-                        <Box
-                            flex={1}
-                            alignContent={"center"}
-                            style={{
-                                width: 256,
-                                height: 256,
-                                display: "flex",
-                                alignItems: "center",
-                            }}
-                        >
-                            <AddConditioner
-                                onAdd={(v) => {
-                                    setActiveConditioners([
-                                        ...activeConditioners,
-                                        {
-                                            Render: v,
-                                        },
-                                    ])
-                                }}
-                            ></AddConditioner>
-                        </Box>
+                        )}
                     </Stack>
                 </Stack>
-                <Generate
-                    progress={progress}
-                    maxProgress={maxProgress}
-                    onClick={async () => {
-                        const res = await api.executePrompt(
-                            0,
-                            ExecuteCustomWorkflow({
-                                checkpoint,
-                                positive,
-                                negative,
-                                samplingMethod,
-                                samplingScheduler,
-                                samplingSteps,
-                                width,
-                                height,
-                                batchSize: 1,
-                                batchCount: 1,
-                                cfgScale,
-                                seed,
-                                resources,
-                                conditioners,
-                            }),
-                            (image) => {
-                                if (!imgRef.current) return
-                                imgRef.current.src = image
-                            },
-                            (prog, max) => {
-                                setProgress(prog)
-                                setMaxProgress(max)
-                            }
-                        )
-
-                        if (!imgRef.current) return
-
-                        imgRef.current.src = URL.createObjectURL(
-                            await api.view(res.output.images[0])
-                        )
-                    }}
-                />
             </Stack>
             <Stack direction={"row"}>
                 <Stack flex={1} direction={"column"}>
@@ -432,16 +441,59 @@ export function CustomWorkflowPage() {
                         />
                     </Stack>
                 </Stack>
-                <Box flex={1} display={"flex"}>
-                    <img
-                        ref={imgRef}
-                        style={{
-                            flex: 1,
-                            marginLeft: "auto",
-                            marginRight: "auto",
+                <Stack>
+                    <Box flex={1} display={"flex"}>
+                        <img
+                            width={512}
+                            height={512}
+                            ref={imageOutputRef}
+                            style={{
+                                flex: 1,
+                                marginLeft: "auto",
+                                marginRight: "auto",
+                            }}
+                        />
+                    </Box>
+                    <Generate
+                        progress={progress}
+                        maxProgress={maxProgress}
+                        onClick={async () => {
+                            const res = await api.executePrompt(
+                                0,
+                                ExecuteCustomWorkflow({
+                                    checkpoint,
+                                    positive,
+                                    negative,
+                                    samplingMethod,
+                                    samplingScheduler,
+                                    samplingSteps,
+                                    width,
+                                    height,
+                                    batchSize: 1,
+                                    batchCount: 1,
+                                    cfgScale,
+                                    seed,
+                                    resources,
+                                    conditioners,
+                                }),
+                                (image) => {
+                                    if (!imageOutputRef.current) return
+                                    imageOutputRef.current.src = image
+                                },
+                                (prog, max) => {
+                                    setProgress(prog)
+                                    setMaxProgress(max)
+                                }
+                            )
+
+                            if (!imageOutputRef.current) return
+
+                            imageOutputRef.current.src = URL.createObjectURL(
+                                await api.view(res.output.images[0])
+                            )
                         }}
                     />
-                </Box>
+                </Stack>
             </Stack>
         </Stack>
     )

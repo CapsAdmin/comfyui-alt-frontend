@@ -21,33 +21,37 @@ export const ImageUploadZone = (props: {
             }
         }
     }
-
-    const onDrop = useCallback(async (files: Array<File>) => {
-        const uploadedResult = await api.uploadFile(files[0])
-        setImageFile(uploadedResult)
-        const reader = new FileReader()
-        reader.onload = function (e) {
-            if (imageRef.current) {
-                imageRef.current.src = e.target?.result as string
-            }
-        }
-        reader.readAsDataURL(files[0])
-
-        if (props.getOverlayImage) {
-            if (props.getOverlayImage && overlayImageRef.current) {
-                overlayImageRef.current.src = await props.getOverlayImage(uploadedResult)
-                overlayImageRef.current.style.opacity = "1"
-            }
-        }
-    }, [])
-
     const onChange = props.onChange
+    const getOverlayImage = props.getOverlayImage
+
+    const onDrop = useCallback(
+        async (files: Array<File>) => {
+            const uploadedResult = await api.uploadFile(files[0])
+            setImageFile(uploadedResult)
+            const reader = new FileReader()
+            reader.onload = function (e) {
+                if (imageRef.current) {
+                    imageRef.current.src = e.target?.result as string
+                }
+            }
+            reader.readAsDataURL(files[0])
+
+            if (getOverlayImage) {
+                if (getOverlayImage && overlayImageRef.current) {
+                    overlayImageRef.current.src = await getOverlayImage(uploadedResult)
+                    overlayImageRef.current.style.opacity = "1"
+                }
+            }
+        },
+        [getOverlayImage]
+    )
 
     useEffect(() => {
         if (imageFile === undefined) {
             return
         }
         onChange(imageFile)
+        console.log("LOL", onChange)
     }, [onChange, imageFile])
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop })

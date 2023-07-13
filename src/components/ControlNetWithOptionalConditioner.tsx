@@ -56,6 +56,8 @@ export const ControlNetWithOptionalPreprocessor = (props: {
     const checkPoint = props.checkpoint
     const PreProcessor = props.preprocessor
     const [config, setConfig] = useState(props.propConfig || {})
+    const [strength, setStrength] = useState(1)
+    const [preProcess, setPreProcess] = useState(true)
 
     const runPreProcessor = (image: any) => {
         if (!preProcess) {
@@ -76,9 +78,6 @@ export const ControlNetWithOptionalPreprocessor = (props: {
             ...key_values,
         })
     }
-
-    const [strength, setStrength] = useState(1)
-    const [preProcess, setPreProcess] = useState(true)
 
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     const refreshOverlay = useRef<() => void>(() => {})
@@ -101,7 +100,7 @@ export const ControlNetWithOptionalPreprocessor = (props: {
 
     return (
         <Stack>
-            <Typography>{props.title}</Typography>
+            <Typography>{props.title + " " + props.id}</Typography>
             <ImageUploadZone
                 refreshOverlay={refreshOverlay}
                 getOverlayImage={async (file) => {
@@ -173,11 +172,13 @@ export const ControlNetWithOptionalPreprocessor = (props: {
                                         max={value.max}
                                         step={value.step}
                                         label={key}
+                                        key={key}
                                     />
                                 )
                             } else if (value.type == "boolean") {
                                 return (
                                     <LabeledCheckbox
+                                        key={key}
                                         value={value.value == value._true ? true : false}
                                         label={key}
                                         onChange={(v) =>

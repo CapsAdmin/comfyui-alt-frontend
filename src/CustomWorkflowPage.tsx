@@ -1,8 +1,11 @@
 import { Add, Delete } from "@mui/icons-material"
 import {
     Box,
+    Button,
     Card,
     Fab,
+    IconButton,
+    LinearProgress,
     List,
     ListItem,
     Menu,
@@ -30,7 +33,6 @@ import {
     VAEDecode,
     VAEEncode,
 } from "./Api/Nodes"
-import { Generate } from "./components/Generate"
 import { LabeledSlider } from "./components/LabeledSlider"
 import {
     ClipVision,
@@ -202,7 +204,7 @@ function AddConditioner(props: {
 
     return (
         <>
-            <Fab size="small" color="secondary" onClick={handleClick}>
+            <Fab size="small" color="primary" onClick={handleClick}>
                 <Add></Add>
             </Fab>
             <Menu
@@ -230,6 +232,148 @@ function AddConditioner(props: {
     )
 }
 
+const Conditioners = (props: { config: Config; setConfig: (config: Config) => void }) => {
+    const config = props.config
+    const setConfig = props.setConfig
+    const [selectedConditioner, setSelectedConditioner] = useState<Config["conditioners"][number]>()
+
+    return (
+        <Stack direction="row" spacing={1}>
+            <List>
+                {config.conditioners.map((obj, i) => (
+                    <ListItem
+                        selected={selectedConditioner?.id === obj.id}
+                        button
+                        key={i}
+                        onClick={() => setSelectedConditioner(obj)}
+                    >
+                        <Typography>{obj.title}</Typography>
+                    </ListItem>
+                ))}
+
+                <ListItem>
+                    <Box justifyContent={"center"} display={"flex"} flex={1}>
+                        <AddConditioner
+                            onAdd={(obj) => {
+                                config.conditioners.push(new obj(CONDITIONER_ID++))
+                                setConfig({ ...config })
+                            }}
+                        ></AddConditioner>
+                    </Box>
+                </ListItem>
+            </List>
+            {selectedConditioner && (
+                <Card style={{ position: "relative" }}>
+                    <IconButton
+                        style={{
+                            position: "absolute",
+                            right: -10,
+                            top: -5,
+                            zIndex: 1,
+                        }}
+                        size="small"
+                        onClick={() => {
+                            config.conditioners = config.conditioners.filter(
+                                (c) => c.id !== selectedConditioner.id
+                            )
+                            setConfig({ ...config })
+                            setSelectedConditioner(config.conditioners[0])
+                        }}
+                    >
+                        <Delete></Delete>
+                    </IconButton>
+
+                    <selectedConditioner.render
+                        value={selectedConditioner.config as any}
+                        onChange={(v) => {
+                            const found = config.conditioners.find(
+                                (c) => c.id === selectedConditioner.id
+                            )
+                            if (found) {
+                                found.config = v
+                            }
+                            setConfig({ ...config })
+                        }}
+                    />
+                </Card>
+            )}
+        </Stack>
+    )
+}
+
+const Prompts = (props: { config: Config; setConfig: (config: Config) => void }) => {
+    const config = props.config
+    const setConfig = props.setConfig
+
+    return (
+        <Stack flex={1} spacing={1}>
+            <TextField
+                label="positive"
+                value={config.positive}
+                onChange={(e) => setConfig({ ...config, positive: e.target.value })}
+                multiline
+                minRows={3}
+            />
+            <TextField
+                label="negative"
+                value={config.negative}
+                onChange={(e) => setConfig({ ...config, negative: e.target.value })}
+                multiline
+                minRows={3}
+            />
+            <LabeledSlider
+                value={config.cfgScale}
+                onChange={(v) => setConfig({ ...config, cfgScale: v })}
+                min={1}
+                max={30}
+                step={0.5}
+                label="CFG Scale"
+            />
+        </Stack>
+    )
+}
+
+const Sampler = (props: {
+    config: Config
+    setConfig: (config: Config) => void
+    resources: ComfyResources
+}) => {
+    const config = props.config
+    const setConfig = props.setConfig
+    const resources = props.resources
+
+    return (
+        <Stack direction={"column"}>
+            <Typography>Sampler</Typography>
+            <Stack direction={"row"}>
+                <Select
+                    style={{ flex: 1 }}
+                    value={config.samplingMethod}
+                    onChange={(e) => setConfig({ ...config, samplingMethod: e.target.value })}
+                >
+                    {resources.samplingMethods.map((v) => (
+                        <MenuItem key={v} value={v}>
+                            {v}
+                        </MenuItem>
+                    ))}
+                </Select>
+
+                <Select
+                    style={{ flex: 1 }}
+                    value={config.samplingScheduler}
+                    onChange={(e) => setConfig({ ...config, samplingScheduler: e.target.value })}
+                >
+                    {resources.samplingSchedulers.map((v) => (
+                        <MenuItem key={v} value={v}>
+                            {v}
+                        </MenuItem>
+                    ))}
+                </Select>
+            </Stack>
+        </Stack>
+    )
+}
+
 export function CustomWorkflowPage() {
     const imageOutputRef = useRef<HTMLImageElement>(null)
     const resources = useComfyAPI()
@@ -237,7 +381,7 @@ export function CustomWorkflowPage() {
     const [progress, setProgress] = useState(0)
     const [maxProgress, setMaxProgress] = useState(0)
 
-    const [config, setConfig] = useState<Config>({
+    let [config, setConfig] = useState<Config>({
         checkpoint: "anime/Anything-V3.0-pruned-fp32.ckpt",
         positive: "",
         negative: "",
@@ -254,10 +398,14 @@ export function CustomWorkflowPage() {
         resources,
     })
 
-    const [selectedConditioner, setSelectedConditioner] = useState<Config["conditioners"][number]>()
+    const old = setConfig
+    setConfig = (config) => {
+        old(config)
+        console.log(new Error().stack)
+    }
 
     return (
-        <Stack>
+        <Stack spacing={1} margin={4}>
             <Select
                 style={{ flex: 1 }}
                 value={config.checkpoint}
@@ -271,170 +419,79 @@ export function CustomWorkflowPage() {
             </Select>
 
             <Stack direction={"row"}>
-                <Stack flex={1}>
-                    <TextField
-                        label="positive"
-                        value={config.positive}
-                        onChange={(e) => setConfig({ ...config, positive: e.target.value })}
-                        multiline
-                        minRows={3}
-                    />
-                    <TextField
-                        label="negative"
-                        value={config.negative}
-                        onChange={(e) => setConfig({ ...config, negative: e.target.value })}
-                        multiline
-                        minRows={3}
-                    />
-                    <LabeledSlider
-                        value={config.cfgScale}
-                        onChange={(v) => setConfig({ ...config, cfgScale: v })}
-                        min={1}
-                        max={30}
-                        step={0.5}
-                        label="CFG Scale"
-                    />
-                    <Stack direction="row">
-                        <List>
-                            {config.conditioners.map((obj, i) => (
-                                <ListItem
-                                    selected={selectedConditioner?.id === obj.id}
-                                    button
-                                    key={i}
-                                    onClick={() => setSelectedConditioner(obj)}
-                                >
-                                    <Typography>{obj.title}</Typography>
-                                </ListItem>
-                            ))}
-
-                            <AddConditioner
-                                onAdd={(obj) => {
-                                    config.conditioners.push(new obj(CONDITIONER_ID++))
-                                    setConfig({ ...config })
-                                }}
-                            ></AddConditioner>
-                        </List>
-                        {selectedConditioner && (
-                            <Card style={{ position: "relative" }}>
-                                <Fab
-                                    style={{ position: "absolute", right: 0, top: 0 }}
-                                    size="small"
-                                    onClick={() => {
-                                        config.conditioners = config.conditioners.filter(
-                                            (c) => c.id !== selectedConditioner.id
-                                        )
-                                        setConfig({ ...config })
-                                        setSelectedConditioner(config.conditioners[0])
-                                    }}
-                                >
-                                    <Delete></Delete>
-                                </Fab>
-
-                                <selectedConditioner.render
-                                    value={selectedConditioner.config as any}
-                                    onChange={(v) => {
-                                        const found = config.conditioners.find(
-                                            (c) => c.id === selectedConditioner.id
-                                        )
-                                        if (found) {
-                                            found.config = v
-                                        }
-                                        setConfig({ ...config })
-                                    }}
-                                />
-                            </Card>
-                        )}
-                    </Stack>
-                </Stack>
-            </Stack>
-            <Stack direction={"row"}>
-                <Stack flex={1} direction={"column"}>
-                    <Stack direction={"column"}>
-                        <Stack direction={"column"}>
-                            <Typography>Sampler</Typography>
-                            <Stack direction={"row"}>
-                                <Select
-                                    style={{ flex: 1 }}
-                                    value={config.samplingMethod}
-                                    onChange={(e) =>
-                                        setConfig({ ...config, samplingMethod: e.target.value })
-                                    }
-                                >
-                                    {resources.samplingMethods.map((v) => (
-                                        <MenuItem key={v} value={v}>
-                                            {v}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-
-                                <Select
-                                    style={{ flex: 1 }}
-                                    value={config.samplingScheduler}
-                                    onChange={(e) =>
-                                        setConfig({ ...config, samplingScheduler: e.target.value })
-                                    }
-                                >
-                                    {resources.samplingSchedulers.map((v) => (
-                                        <MenuItem key={v} value={v}>
-                                            {v}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </Stack>
-                        </Stack>
-
-                        <LabeledSlider
-                            value={config.samplingSteps}
-                            onChange={(v) => setConfig({ ...config, samplingSteps: v })}
-                            min={0}
-                            max={150}
-                            step={1}
-                            label="Sampling Steps"
-                        ></LabeledSlider>
-
-                        <LabeledSlider
-                            value={config.seed}
-                            onChange={(v) => setConfig({ ...config, seed: v })}
-                            min={-1}
-                            max={10000000000000}
-                            step={1}
-                            label="Noise Seed"
-                        />
-
-                        <LabeledSlider
-                            value={config.width}
-                            onChange={(v) => setConfig({ ...config, width: v })}
-                            min={0}
-                            max={2048}
-                            step={64}
-                            label="Width"
-                        />
-                        <LabeledSlider
-                            value={config.height}
-                            onChange={(v) => setConfig({ ...config, height: v })}
-                            min={0}
-                            max={2048}
-                            step={64}
-                            label="Height"
-                        />
-                    </Stack>
-                </Stack>
-                <Stack>
-                    <Box flex={1} display={"flex"}>
-                        <img
-                            width={512}
-                            height={512}
-                            ref={imageOutputRef}
-                            style={{
-                                flex: 1,
-                                marginLeft: "auto",
-                                marginRight: "auto",
-                            }}
-                        />
+                <Card style={{ flex: 1 }}>
+                    <Box margin={2}>
+                        <Prompts config={config} setConfig={setConfig}></Prompts>
                     </Box>
-                    <Generate
-                        progress={progress}
-                        maxProgress={maxProgress}
+                </Card>
+            </Stack>
+
+            <Stack direction={"row"} spacing={1}>
+                <Stack flex={1} direction={"column"} spacing={1}>
+                    <Stack direction={"column"} spacing={1}>
+                        <Card>
+                            <Box margin={2}>
+                                <Stack direction={"column"} spacing={1}>
+                                    <Sampler
+                                        config={config}
+                                        setConfig={setConfig}
+                                        resources={resources}
+                                    />
+
+                                    <LabeledSlider
+                                        value={config.samplingSteps}
+                                        onChange={(v) => setConfig({ ...config, samplingSteps: v })}
+                                        min={0}
+                                        max={150}
+                                        step={1}
+                                        label="Sampling Steps"
+                                    ></LabeledSlider>
+
+                                    <LabeledSlider
+                                        value={config.seed}
+                                        onChange={(v) => setConfig({ ...config, seed: v })}
+                                        min={-1}
+                                        max={10000000000000}
+                                        step={1}
+                                        label="Noise Seed"
+                                    />
+                                </Stack>
+                            </Box>
+                        </Card>
+
+                        <Card>
+                            <Box margin={2}>
+                                <Stack direction={"column"} spacing={1}>
+                                    <LabeledSlider
+                                        value={config.width}
+                                        onChange={(v) => setConfig({ ...config, width: v })}
+                                        min={0}
+                                        max={2048}
+                                        step={64}
+                                        label="Width"
+                                    />
+                                    <LabeledSlider
+                                        value={config.height}
+                                        onChange={(v) => setConfig({ ...config, height: v })}
+                                        min={0}
+                                        max={2048}
+                                        step={64}
+                                        label="Height"
+                                    />
+                                </Stack>
+                            </Box>
+                        </Card>
+                        <Card>
+                            <Box margin={2}>
+                                <Conditioners config={config} setConfig={setConfig}></Conditioners>
+                            </Box>
+                        </Card>
+                    </Stack>
+                </Stack>
+                <Stack spacing={0.2}>
+                    <Button
+                        fullWidth
+                        variant="contained"
                         onClick={async () => {
                             const res = await api.executePrompt(
                                 0,
@@ -455,6 +512,26 @@ export function CustomWorkflowPage() {
                                 await api.view(res.output.images[0])
                             )
                         }}
+                    >
+                        generate
+                    </Button>
+
+                    <Box display={"flex"}>
+                        <img
+                            width={512}
+                            height={512}
+                            ref={imageOutputRef}
+                            style={{
+                                flex: 1,
+                                marginLeft: "auto",
+                                marginRight: "auto",
+                            }}
+                        />
+                    </Box>
+                    <LinearProgress
+                        color="secondary"
+                        variant="determinate"
+                        value={(progress / maxProgress) * 100}
                     />
                 </Stack>
             </Stack>

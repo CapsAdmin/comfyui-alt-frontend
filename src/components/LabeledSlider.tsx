@@ -40,7 +40,6 @@ export function LabeledSlider(props: {
                     {props.label}
                 </Typography>
                 <Input
-                    style={{ width: 120 }}
                     value={props.value}
                     size="small"
                     onChange={handleInputChange}

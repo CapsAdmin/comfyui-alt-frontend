@@ -157,10 +157,10 @@ export abstract class ControlNetPreprocessorBase extends BaseConditioner {
             timerId = setTimeout(() => {
                 refreshPreview()
             }, 250)
-        }, [props.value])
+        }, [JSON.stringify(props.value)])
 
         return (
-            <Stack>
+            <Stack spacing={1}>
                 <Typography>{this.title}</Typography>
                 <ImageUploadZone
                     value={props.value.image}
@@ -187,7 +187,6 @@ export abstract class ControlNetPreprocessorBase extends BaseConditioner {
                         <>
                             {Object.entries(this.propConfig).map(([name, prop]) => {
                                 if (prop.type == "number") {
-                                    console.log(props.value[name])
                                     return (
                                         <LabeledSlider
                                             value={props.value[name]}

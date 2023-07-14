@@ -302,6 +302,7 @@ class ComfyApi extends EventTarget {
         }
         prompt_id: string
     }> {
+        console.log("PROMPT:", prompt)
         const progress = (data: any) => {
             const progress = data.detail.value as number
             const max = data.detail.max as number

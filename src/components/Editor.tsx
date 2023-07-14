@@ -138,13 +138,6 @@ export const Editor = () => {
                         cropMode="center-middle"
                     />
                 </Gizmo>
-
-                <Gizmo>
-                    <CroppedImage
-                        url="https://konvajs.org/assets/yoda.jpg"
-                        cropMode="center-middle"
-                    />
-                </Gizmo>
             </Layer>
         </Stage>
     )

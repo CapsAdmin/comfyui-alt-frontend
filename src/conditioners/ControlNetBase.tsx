@@ -1,5 +1,5 @@
 import { Stack, Typography } from "@mui/material"
-import { LabeledSlider } from "./LabeledSlider"
+import { LabeledSlider } from "../components/LabeledSlider"
 
 import { useEffect, useState } from "react"
 import { ComfyFile, ComfyResources, api } from "../Api/Api"
@@ -10,8 +10,9 @@ import {
     LoadImage,
     PreviewImage,
 } from "../Api/Nodes"
-import { ImageUploadZone } from "./ImageUploadZone"
-import { LabeledCheckbox } from "./LabeledCheckbox"
+import { ImageUploadZone } from "../components/ImageUploadZone"
+import { LabeledCheckbox } from "../components/LabeledCheckbox"
+import { BaseConditioner } from "./Base"
 
 let timerId: number
 
@@ -30,10 +31,9 @@ export type PropConfig =
           value: any
       }
 
-export abstract class ControlNetPreprocessorBase {
-    name = "controlnet-preprocessor"
+export abstract class ControlNetPreprocessorBase extends BaseConditioner {
+    title = "controlnet-preprocessor"
     type = "conditioner" as const
-    id: number
 
     abstract propConfig?: { [key: string]: PropConfig }
     abstract PreProcessor: (input: any) => { IMAGE0: any }
@@ -64,17 +64,6 @@ export abstract class ControlNetPreprocessorBase {
         this._config = value
     }
 
-    constructor(id: number) {
-        this.id = id
-
-        this.init()
-    }
-
-    init() {
-        console.log(this.propConfig)
-        console.log(this.config)
-    }
-
     runPreprocessor(image: any) {
         if (!this.config.preProcess) {
             return image
@@ -85,17 +74,16 @@ export abstract class ControlNetPreprocessorBase {
                 image: image.IMAGE0,
             })
         }
-        type Key = keyof typeof this.propConfig
 
-        const key_values = {} as { [key in Key]: any }
+        const keyValues: { [key: string]: any } = {}
 
         for (const key in this.propConfig) {
-            key_values[key as Key] = this.config[key as Key]
+            keyValues[key] = this.config[key as keyof typeof this.config]
         }
 
         return this.PreProcessor({
             image: image.IMAGE0,
-            ...key_values,
+            ...keyValues,
         })
     }
 
@@ -173,7 +161,7 @@ export abstract class ControlNetPreprocessorBase {
 
         return (
             <Stack>
-                <Typography>{this.name}</Typography>
+                <Typography>{this.title}</Typography>
                 <ImageUploadZone
                     value={props.value.image}
                     overlayImage={imageOverlayFile}

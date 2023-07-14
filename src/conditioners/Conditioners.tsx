@@ -1,24 +1,26 @@
 import { Stack, Typography } from "@mui/material"
-import { LabeledSlider } from "./components/LabeledSlider"
+import { LabeledSlider } from "../components/LabeledSlider"
 
-import { ComfyFile, ComfyResources } from "./Api/Api"
+import { ComfyFile, ComfyResources } from "../Api/Api"
 import {
-    CannyEdgePreprocessor,
     CLIPVisionEncode,
     CLIPVisionLoader,
+    CannyEdgePreprocessor,
     ConditioningAverage_,
     LineArtPreprocessor,
     LoadImage,
     StyleModelApply,
     StyleModelLoader,
     Zoe_DepthMapPreprocessor,
-} from "./Api/Nodes"
-import { ControlNetPreprocessorBase } from "./components/ControlNetWithOptionalConditioner"
-import { ImageUploadZone } from "./components/ImageUploadZone"
-import { LabeledCheckbox } from "./components/LabeledCheckbox"
-import { Config } from "./CustomWorkflowPage"
+} from "../Api/Nodes"
+import { Config } from "../CustomWorkflowPage"
+import { ImageUploadZone } from "../components/ImageUploadZone"
+import { LabeledCheckbox } from "../components/LabeledCheckbox"
+import { BaseConditioner } from "./Base"
+import { ControlNetPreprocessorBase } from "./ControlNetBase"
+
 export class ControlNetCannyEdge extends ControlNetPreprocessorBase {
-    name = "Canny Edge"
+    title = "Canny Edge"
     checkPoint = "t2iadapter_canny_sd15v2.pth"
     PreProcessor = CannyEdgePreprocessor
     propConfig = {
@@ -34,14 +36,14 @@ export class ControlNetCannyEdge extends ControlNetPreprocessorBase {
 }
 
 export class ControlNetDepth extends ControlNetPreprocessorBase {
-    name = "Depth"
+    title = "Depth"
     checkPoint = "t2iadapter_depth_sd15v2.pth"
     PreProcessor = Zoe_DepthMapPreprocessor
     propConfig = undefined
 }
 
 export class ControlNetLineArt extends ControlNetPreprocessorBase {
-    name = "Line Art"
+    title = "Line Art"
     checkPoint = "control_v11p_sd15_lineart.pth"
     PreProcessor = LineArtPreprocessor
     propConfig = {
@@ -54,21 +56,13 @@ export class ControlNetLineArt extends ControlNetPreprocessorBase {
     }
 }
 
-export class ClipVision {
-    name = "clip vision"
+export class ClipVision extends BaseConditioner {
+    title = "Clip Vision"
     type = "conditioner" as const
-
-    id: number
-
-    constructor(id: number) {
-        this.id = id
-    }
-
     config = {
-        strength: 0.75,
+        strength: 1,
         image: undefined as ComfyFile | undefined,
     }
-
     apply(conditioning: { CONDITIONING0: any }, resources: ComfyResources) {
         const image = LoadImage({
             image: this.config.image!.name,
@@ -108,7 +102,7 @@ export class ClipVision {
     }) => {
         return (
             <Stack>
-                <Typography>Clip Vision</Typography>
+                <Typography>{this.title}</Typography>
                 <ImageUploadZone
                     value={props.value.image}
                     onChange={(file) => props.onChange({ ...props.value, image: file })}
@@ -128,22 +122,14 @@ export class ClipVision {
     }
 }
 
-export class ImageToImage {
-    name = "img2img"
+export class ImageToImage extends BaseConditioner {
+    title = "Image To Image"
     type = "config" as const
-
-    id: number
-
-    constructor(id: number) {
-        this.id = id
-    }
-
     config = {
         imageCrop: true,
         imageDenoise: 0.75,
         image: undefined as ComfyFile | undefined,
     }
-
     apply(config: Config, resources: ComfyResources) {
         config.image = this.config.image
         config.imageDenoise = this.config.imageDenoise
@@ -156,7 +142,7 @@ export class ImageToImage {
     }) => {
         return (
             <Stack>
-                <Typography>img2img</Typography>
+                <Typography>{this.title}</Typography>
                 <ImageUploadZone
                     value={props.value.image}
                     onChange={(file) => props.onChange({ ...props.value, image: file })}

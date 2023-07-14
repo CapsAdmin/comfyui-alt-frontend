@@ -30,15 +30,15 @@ import {
     VAEDecode,
     VAEEncode,
 } from "./Api/Nodes"
+import { Generate } from "./components/Generate"
+import { LabeledSlider } from "./components/LabeledSlider"
 import {
     ClipVision,
     ControlNetCannyEdge,
     ControlNetDepth,
     ControlNetLineArt,
     ImageToImage,
-} from "./Conditioners"
-import { Generate } from "./components/Generate"
-import { LabeledSlider } from "./components/LabeledSlider"
+} from "./conditioners/Conditioners"
 import { PreprocessPrompts } from "./utils/prompts"
 
 const availableConditioners = [
@@ -186,6 +186,8 @@ const ExecuteCustomWorkflow = (config: {
 
 export type Config = Parameters<typeof ExecuteCustomWorkflow>[0]
 
+let CONDITIONER_ID = 0
+
 function AddConditioner(props: {
     onAdd: (conditioner: (typeof availableConditioners)[number], id: number) => void
 }) {
@@ -301,13 +303,13 @@ export function CustomWorkflowPage() {
                                     key={i}
                                     onClick={() => setSelectedConditioner(obj)}
                                 >
-                                    <Typography>{obj.name}</Typography>
+                                    <Typography>{obj.title}</Typography>
                                 </ListItem>
                             ))}
 
                             <AddConditioner
                                 onAdd={(obj) => {
-                                    config.conditioners.push(new obj(config.conditioners.length))
+                                    config.conditioners.push(new obj(CONDITIONER_ID++))
                                     setConfig({ ...config })
                                 }}
                             ></AddConditioner>

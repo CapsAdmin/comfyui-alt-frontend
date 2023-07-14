@@ -315,17 +315,32 @@ class ComfyApi extends EventTarget {
         this.addEventListener("progress", progress)
         this.addEventListener("b_preview", b_preview)
 
+        const captured = new Map<string, any>()
+
+        const executed = (event: any) => {
+            captured.set(event.detail.prompt_id, event.detail)
+        }
+
+        this.addEventListener("executed", executed)
+
         const res = await this.queuePrompt(number, prompt)
+
         return new Promise((resolve, reject) => {
-            const executed = (event: any) => {
-                if (event.detail.prompt_id === res.prompt_id) {
+            let timeout: any
+            const check = () => {
+                const data = captured.get(res.prompt_id)
+                if (data) {
+                    clearTimeout(timeout)
+                    resolve(data)
+
                     this.removeEventListener("executed", executed)
                     this.removeEventListener("progress", progress)
                     this.removeEventListener("b_preview", b_preview)
-                    resolve(event.detail)
+                } else {
+                    timeout = setTimeout(check, 0)
                 }
             }
-            this.addEventListener("executed", executed)
+            check()
         })
     }
 

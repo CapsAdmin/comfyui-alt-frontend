@@ -13,73 +13,50 @@ import {
     StyleModelLoader,
     Zoe_DepthMapPreprocessor,
 } from "./Api/Nodes"
-import {
-    ControlNetConditioner,
-    ControlNetWithOptionalPreprocessor,
-} from "./components/ControlNetWithOptionalConditioner"
+import { ControlNetPreprocessorBase } from "./components/ControlNetWithOptionalConditioner"
 import { ImageUploadZone } from "./components/ImageUploadZone"
 import { LabeledCheckbox } from "./components/LabeledCheckbox"
 import { Config } from "./CustomWorkflowPage"
+export class ControlNetCannyEdge extends ControlNetPreprocessorBase {
+    name = "Canny Edge"
+    checkPoint = "t2iadapter_canny_sd15v2.pth"
+    PreProcessor = CannyEdgePreprocessor
+    propConfig = {
+        low_threshold: { type: "number" as const, min: 0, max: 255, step: 1, value: 100 },
+        high_threshold: { type: "number" as const, min: 0, max: 255, step: 1, value: 200 },
+        l2gradient: {
+            type: "boolean" as const,
+            _true: "enable",
+            _false: "disable",
+            value: "disable" as "enable" | "disable",
+        },
+    }
+}
 
-export const ControlNetCannyEdge = (props: {
-    id: number
-    onChange: (conditioning: ControlNetConditioner) => void
-}) => (
-    <ControlNetWithOptionalPreprocessor
-        title="Canny Edge"
-        id={props.id}
-        preprocessor={CannyEdgePreprocessor}
-        checkpoint="t2iadapter_canny_sd15v2.pth"
-        propConfig={{
-            low_threshold: { type: "number" as const, min: 0, max: 255, step: 1, value: 100 },
-            high_threshold: { type: "number" as const, min: 0, max: 255, step: 1, value: 200 },
-            l2gradient: {
-                type: "boolean" as const,
-                _true: "enable",
-                _false: "disable",
-                value: "disable" as "enable" | "disable",
-            },
-        }}
-        onChange={props.onChange}
-    />
-)
+export class ControlNetDepth extends ControlNetPreprocessorBase {
+    name = "Depth"
+    checkPoint = "t2iadapter_depth_sd15v2.pth"
+    PreProcessor = Zoe_DepthMapPreprocessor
+    propConfig = undefined
+}
 
-export const ControlNetLineArt = (props: {
-    id: number
-    onChange: (conditioning: ControlNetConditioner) => void
-}) => (
-    <ControlNetWithOptionalPreprocessor
-        title="Line Art"
-        id={props.id}
-        preprocessor={LineArtPreprocessor}
-        checkpoint="control_v11p_sd15_lineart.pth"
-        propConfig={{
-            coarse: {
-                type: "boolean" as const,
-                _true: "enable",
-                _false: "disable",
-                value: "disable" as "enable" | "disable",
-            },
-        }}
-        onChange={props.onChange}
-    />
-)
-export const ControlNetDepth = (props: {
-    id: number
-    onChange: (conditioning: ControlNetConditioner) => void
-}) => (
-    <ControlNetWithOptionalPreprocessor
-        title="Depth"
-        id={props.id}
-        preprocessor={Zoe_DepthMapPreprocessor}
-        checkpoint="t2iadapter_depth_sd15v2.pth"
-        onChange={props.onChange}
-    />
-)
+export class ControlNetLineArt extends ControlNetPreprocessorBase {
+    name = "Line Art"
+    checkPoint = "control_v11p_sd15_lineart.pth"
+    PreProcessor = LineArtPreprocessor
+    propConfig = {
+        coarse: {
+            type: "boolean" as const,
+            _true: "enable",
+            _false: "disable",
+            value: "disable" as "enable" | "disable",
+        },
+    }
+}
 
 export class ClipVision {
     name = "clip vision"
-    type = "conditioner"
+    type = "conditioner" as const
 
     id: number
 
@@ -153,7 +130,7 @@ export class ClipVision {
 
 export class ImageToImage {
     name = "img2img"
-    type = "config"
+    type = "config" as const
 
     id: number
 

@@ -1,5 +1,5 @@
 import { Box, Typography } from "@mui/material"
-import { useCallback } from "react"
+import { useCallback, useEffect, useRef } from "react"
 import { useDropzone } from "react-dropzone"
 import { ComfyFile, api } from "../Api/Api"
 
@@ -8,6 +8,8 @@ export const ImageUploadZone = (props: {
     overlayImage?: ComfyFile
     onChange: (image: ComfyFile) => void
 }) => {
+    const imageRef = useRef<HTMLImageElement>(null)
+    const overlayImageRef = useRef<HTMLImageElement>(null)
     const onImageUpload = props.onChange
 
     const onDrop = useCallback(
@@ -19,6 +21,43 @@ export const ImageUploadZone = (props: {
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop })
     const size = 256
+
+    useEffect(() => {
+        ;(async () => {
+            const img = imageRef.current
+            if (!img) return
+
+            if (props.value) {
+                img.src = URL.createObjectURL(
+                    await api.view({
+                        filename: props.value.name,
+                        type: props.value.type,
+                    })
+                )
+            } else {
+                img.src = ""
+            }
+        })()
+    }, [props.value])
+
+    useEffect(() => {
+        ;(async () => {
+            const img = overlayImageRef.current
+            if (!img) return
+
+            if (props.overlayImage) {
+                img.src = URL.createObjectURL(
+                    await api.view({
+                        filename: props.overlayImage.name,
+                        type: props.overlayImage.type,
+                    })
+                )
+            } else {
+                img.src = ""
+            }
+        })()
+    }, [props.overlayImage])
+
     return (
         <Box>
             <div
@@ -32,16 +71,7 @@ export const ImageUploadZone = (props: {
                     <Typography>Drag 'n' drop some files here, or click to select files</Typography>
                 )}
                 <img
-                    ref={async (img) => {
-                        if (!img || !props.value) return
-
-                        img.src = URL.createObjectURL(
-                            await api.view({
-                                filename: props.value.name,
-                                type: props.value.type,
-                            })
-                        )
-                    }}
+                    ref={imageRef}
                     style={{
                         position: "absolute",
                         width: size,
@@ -52,16 +82,7 @@ export const ImageUploadZone = (props: {
                     }}
                 ></img>
                 <img
-                    ref={async (img) => {
-                        if (!img || !props.overlayImage) return
-
-                        img.src = URL.createObjectURL(
-                            await api.view({
-                                filename: props.overlayImage.name,
-                                type: props.overlayImage.type,
-                            })
-                        )
-                    }}
+                    ref={overlayImageRef}
                     onMouseOver={(e) => {
                         const img = e.target as HTMLImageElement
                         img.style.opacity = "0"

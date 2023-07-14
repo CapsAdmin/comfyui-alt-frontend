@@ -30,10 +30,24 @@ import {
     VAEDecode,
     VAEEncode,
 } from "./Api/Nodes"
-import { ClipVision, ImageToImage } from "./Conditioners"
+import {
+    ClipVision,
+    ControlNetCannyEdge,
+    ControlNetDepth,
+    ControlNetLineArt,
+    ImageToImage,
+} from "./Conditioners"
 import { Generate } from "./components/Generate"
 import { LabeledSlider } from "./components/LabeledSlider"
 import { PreprocessPrompts } from "./utils/prompts"
+
+const availableConditioners = [
+    ClipVision,
+    ImageToImage,
+    ControlNetDepth,
+    ControlNetLineArt,
+    ControlNetCannyEdge,
+] as const
 
 const ExecuteCustomWorkflow = (config: {
     checkpoint: string
@@ -60,7 +74,7 @@ const ExecuteCustomWorkflow = (config: {
     imageCrop?: boolean
     imageDenoise?: number
 
-    conditioners: Array<ClipVision>
+    conditioners: Array<InstanceType<(typeof availableConditioners)[number]>>
 }) => {
     return BuildWorkflow(() => {
         if (config.conditioners) {
@@ -69,7 +83,6 @@ const ExecuteCustomWorkflow = (config: {
                     conditioner.apply(config, config.resources)
                 }
             }
-            console.log(config)
         }
 
         const { positive, negative, loras, hypernetworks } = PreprocessPrompts(
@@ -172,8 +185,6 @@ const ExecuteCustomWorkflow = (config: {
 }
 
 export type Config = Parameters<typeof ExecuteCustomWorkflow>[0]
-
-const availableConditioners = [ClipVision, ImageToImage] as const
 
 function AddConditioner(props: {
     onAdd: (conditioner: (typeof availableConditioners)[number], id: number) => void
@@ -318,7 +329,7 @@ export function CustomWorkflowPage() {
                                 </Fab>
 
                                 <selectedConditioner.render
-                                    value={selectedConditioner.config}
+                                    value={selectedConditioner.config as any}
                                     onChange={(v) => {
                                         const found = config.conditioners.find(
                                             (c) => c.id === selectedConditioner.id

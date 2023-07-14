@@ -1,8 +1,8 @@
 import { Stack, Typography } from "@mui/material"
 import { LabeledSlider } from "./LabeledSlider"
 
-import { useEffect, useRef, useState } from "react"
-import { ComfyResources, api } from "../Api/Api"
+import { useEffect, useState } from "react"
+import { ComfyFile, ComfyResources, api } from "../Api/Api"
 import {
     BuildWorkflow,
     ControlNetApply,
@@ -12,21 +12,6 @@ import {
 } from "../Api/Nodes"
 import { ImageUploadZone } from "./ImageUploadZone"
 import { LabeledCheckbox } from "./LabeledCheckbox"
-
-export type ControlNetConditioner =
-    | {
-          type: "conditioner"
-          id: number
-          apply: (
-              conditioning: { CONDITIONING0: any },
-              resources: ComfyResources
-          ) => { CONDITIONING0: any }
-      }
-    | {
-          type: "config"
-          id: number
-          apply: (config: any, resources: ComfyResources) => void
-      }
 
 let timerId: number
 
@@ -45,158 +30,212 @@ export type PropConfig =
           value: any
       }
 
-export const ControlNetWithOptionalPreprocessor = (props: {
+export abstract class ControlNetPreprocessorBase {
+    name = "controlnet-preprocessor"
+    type = "conditioner" as const
     id: number
-    title: string
-    checkpoint: string
-    propConfig?: { [key: string]: PropConfig }
-    preprocessor: (input: any) => { IMAGE0: any }
-    onChange: (conditioning: ControlNetConditioner) => void
-}) => {
-    const checkPoint = props.checkpoint
-    const PreProcessor = props.preprocessor
-    const [config, setConfig] = useState(props.propConfig || {})
-    const [strength, setStrength] = useState(1)
-    const [preProcess, setPreProcess] = useState(true)
 
-    const runPreProcessor = (image: any) => {
-        if (!preProcess) {
+    abstract propConfig?: { [key: string]: PropConfig }
+    abstract PreProcessor: (input: any) => { IMAGE0: any }
+    abstract checkPoint: string
+
+    _config = {
+        strength: 1,
+        preProcess: true,
+        image: undefined as ComfyFile | undefined,
+        overlayImage: undefined as ComfyFile | undefined,
+    }
+
+    get config() {
+        const out = { ...this._config }
+
+        if (this.propConfig) {
+            for (const key in this.propConfig) {
+                if (key in out) continue
+                const value = this.propConfig[key as keyof typeof this.propConfig]
+                out[key] = value.value
+            }
+        }
+
+        return out
+    }
+
+    set config(value) {
+        this._config = value
+    }
+
+    constructor(id: number) {
+        this.id = id
+
+        this.init()
+    }
+
+    init() {
+        console.log(this.propConfig)
+        console.log(this.config)
+    }
+
+    runPreprocessor(image: any) {
+        if (!this.config.preProcess) {
             return image
         }
 
-        type Key = keyof typeof config
+        if (!this.propConfig) {
+            return this.PreProcessor({
+                image: image.IMAGE0,
+            })
+        }
+        type Key = keyof typeof this.propConfig
 
         const key_values = {} as { [key in Key]: any }
 
-        for (const key in config) {
-            const value = config[key as Key]
-            key_values[key as Key] = value.value
+        for (const key in this.propConfig) {
+            key_values[key as Key] = this.config[key as Key]
         }
 
-        return PreProcessor({
+        return this.PreProcessor({
             image: image.IMAGE0,
             ...key_values,
         })
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    const refreshOverlay = useRef<() => void>(() => {})
+    apply(conditioning: { CONDITIONING0: any }, resources: ComfyResources) {
+        const image = LoadImage({
+            image: this.config.image?.name,
+        })
 
-    useEffect(() => {
-        if (timerId) {
-            clearTimeout(timerId)
-        }
-        timerId = setTimeout(() => {
-            refreshOverlay.current()
-        }, 250)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [JSON.stringify(config), preProcess])
+        const model = ControlNetLoader({
+            control_net_name: this.checkPoint,
+        })
 
-    useEffect(() => {
-        if (!preProcess) {
-            refreshOverlay.current()
-        }
-    }, [preProcess])
+        const processor = this.runPreprocessor(image)
 
-    return (
-        <Stack>
-            <Typography>{props.title + " " + props.id}</Typography>
-            <ImageUploadZone
-                refreshOverlay={refreshOverlay}
-                getOverlayImage={async (file) => {
+        return ControlNetApply({
+            control_net: model.CONTROL_NET0,
+            image: processor.IMAGE0,
+            strength: this.config.strength,
+            conditioning: conditioning.CONDITIONING0,
+        })
+    }
+
+    render = (props: {
+        value: ControlNetPreprocessorBase["config"]
+        onChange: (value: typeof props.value) => void
+    }) => {
+        const [imageOverlayFile, setImageOverlayFile] = useState<ComfyFile>()
+
+        useEffect(() => {
+            const refreshPreview = () => {
+                const filename = props.value.image?.name
+
+                if (!filename) {
+                    return
+                }
+
+                if (!props.value.preProcess) {
+                    setImageOverlayFile(undefined)
+                    return
+                }
+
+                ;(async () => {
                     const res = await api.executePrompt(
                         0,
                         BuildWorkflow(() => {
                             const image = LoadImage({
-                                image: file.name,
+                                image: filename,
                             })
 
-                            const processor = runPreProcessor(image)
+                            const processor = this.runPreprocessor(image)
 
                             PreviewImage({
                                 images: processor.IMAGE0,
                             })
                         })
                     )
+                    const lol = res.output.images[0]
 
-                    return URL.createObjectURL(await api.view(res.output.images[0]))
-                }}
-                onChange={(file) => {
-                    props.onChange({
-                        type: "conditioner",
-                        id: props.id,
-                        apply: (conditioning) => {
-                            const image = LoadImage({
-                                image: file.name,
-                            })
-
-                            const model = ControlNetLoader({
-                                control_net_name: checkPoint,
-                            })
-
-                            const processor = runPreProcessor(image)
-
-                            return ControlNetApply({
-                                control_net: model.CONTROL_NET0,
-                                image: processor.IMAGE0,
-                                strength: strength,
-                                conditioning: conditioning.CONDITIONING0,
-                            })
-                        },
+                    setImageOverlayFile({
+                        name: lol.filename,
+                        type: lol.type,
+                        subfolder: "",
                     })
-                }}
-            />
+                })()
+            }
+
+            // debounce
+            if (timerId) {
+                clearTimeout(timerId)
+            }
+            timerId = setTimeout(() => {
+                refreshPreview()
+            }, 250)
+        }, [props.value])
+
+        return (
             <Stack>
-                <LabeledSlider
-                    value={strength}
-                    onChange={(v) => setStrength(v)}
-                    min={0}
-                    max={5}
-                    step={0.01}
-                    label="Strength"
+                <Typography>{this.name}</Typography>
+                <ImageUploadZone
+                    value={props.value.image}
+                    overlayImage={imageOverlayFile}
+                    onChange={(file) => props.onChange({ ...props.value, image: file })}
                 />
+                <Stack>
+                    <LabeledSlider
+                        value={props.value.strength}
+                        onChange={(v) => props.onChange({ ...props.value, strength: v })}
+                        min={0}
+                        max={5}
+                        step={0.01}
+                        label="Strength"
+                    />
 
-                <LabeledCheckbox value={preProcess} label="Preprocess" onChange={setPreProcess} />
+                    <LabeledCheckbox
+                        value={props.value.preProcess}
+                        label="Preprocess"
+                        onChange={(v) => props.onChange({ ...props.value, preProcess: v })}
+                    />
 
-                {!preProcess ? null : (
-                    <>
-                        {Object.entries(config).map(([key, value]) => {
-                            if (value.type == "number") {
-                                return (
-                                    <LabeledSlider
-                                        value={value.value}
-                                        onChange={(v) =>
-                                            setConfig({ ...config, [key]: { ...value, value: v } })
-                                        }
-                                        min={value.min}
-                                        max={value.max}
-                                        step={value.step}
-                                        label={key}
-                                        key={key}
-                                    />
-                                )
-                            } else if (value.type == "boolean") {
-                                return (
-                                    <LabeledCheckbox
-                                        key={key}
-                                        value={value.value == value._true ? true : false}
-                                        label={key}
-                                        onChange={(v) =>
-                                            setConfig({
-                                                ...config,
-                                                [key]: {
-                                                    ...value,
-                                                    value: v ? value._true : value._false,
-                                                },
-                                            })
-                                        }
-                                    />
-                                )
-                            }
-                        })}
-                    </>
-                )}
+                    {!this.propConfig || !props.value.preProcess ? null : (
+                        <>
+                            {Object.entries(this.propConfig).map(([name, prop]) => {
+                                if (prop.type == "number") {
+                                    console.log(props.value[name])
+                                    return (
+                                        <LabeledSlider
+                                            value={props.value[name]}
+                                            onChange={(v) =>
+                                                props.onChange({
+                                                    ...props.value,
+                                                    [name]: v,
+                                                })
+                                            }
+                                            min={prop.min}
+                                            max={prop.max}
+                                            step={prop.step}
+                                            label={name}
+                                            key={name}
+                                        />
+                                    )
+                                } else if (prop.type == "boolean") {
+                                    return (
+                                        <LabeledCheckbox
+                                            key={name}
+                                            value={props.value[name] == prop._true ? true : false}
+                                            label={name}
+                                            onChange={(v) => {
+                                                props.onChange({
+                                                    ...props.value,
+                                                    [name]: v ? prop._true : prop._false,
+                                                })
+                                            }}
+                                        />
+                                    )
+                                }
+                            })}
+                        </>
+                    )}
+                </Stack>
             </Stack>
-        </Stack>
-    )
+        )
+    }
 }

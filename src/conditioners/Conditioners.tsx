@@ -9,7 +9,6 @@ import {
     ConditioningAverage_,
     LineArtPreprocessor,
     LoadImage,
-    NodeLink,
     StyleModelApply,
     StyleModelLoader,
     Zoe_DepthMapPreprocessor,
@@ -17,13 +16,13 @@ import {
 import { Config } from "../CustomWorkflowPage"
 import { ImageUploadZone } from "../components/ImageUploadZone"
 import { LabeledCheckbox } from "../components/LabeledCheckbox"
-import { BaseConditioningConditioner, BaseConfigConditioner } from "./Base"
-import { ControlNetPreprocessorBase } from "./ControlNetBase"
+import { BaseConditioningConditioner, BaseConfigConditioner, ConditioningArgument } from "./Base"
+import { ControlNetPreprocessorBase, ImagePreprocessor } from "./ControlNetBase"
 
 export class ControlNetCannyEdge extends ControlNetPreprocessorBase {
     title = "Canny Edge"
     checkPoint = "t2iadapter_canny_sd15v2.pth"
-    PreProcessor = CannyEdgePreprocessor
+    PreProcessor = CannyEdgePreprocessor as ImagePreprocessor
     propConfig = {
         low_threshold: { type: "number" as const, min: 0, max: 255, step: 1, value: 100 },
         high_threshold: { type: "number" as const, min: 0, max: 255, step: 1, value: 200 },
@@ -39,14 +38,14 @@ export class ControlNetCannyEdge extends ControlNetPreprocessorBase {
 export class ControlNetDepth extends ControlNetPreprocessorBase {
     title = "Depth"
     checkPoint = "t2iadapter_depth_sd15v2.pth"
-    PreProcessor = Zoe_DepthMapPreprocessor
+    PreProcessor = Zoe_DepthMapPreprocessor as ImagePreprocessor
     propConfig = undefined
 }
 
 export class ControlNetLineArt extends ControlNetPreprocessorBase {
     title = "Line Art"
     checkPoint = "control_v11p_sd15_lineart.pth"
-    PreProcessor = LineArtPreprocessor
+    PreProcessor = LineArtPreprocessor as ImagePreprocessor
     propConfig = {
         coarse: {
             type: "boolean" as const,
@@ -64,13 +63,7 @@ export class ClipVision extends BaseConditioningConditioner {
         strength: 1,
         image: undefined as ComfyFile | undefined,
     }
-    apply(
-        conditioning: {
-            positive: NodeLink
-            negative: NodeLink
-        },
-        resources: ComfyResources
-    ) {
+    override apply(conditioning: ConditioningArgument, resources: ComfyResources) {
         const image = LoadImage({
             image: this.config.image!.name,
         }).IMAGE0
@@ -100,7 +93,7 @@ export class ClipVision extends BaseConditioningConditioner {
             conditioning_to_strength: this.config.strength,
         })
 
-        return { positive: averager.CONDITIONING0, negative: undefined }
+        return { positive: averager.CONDITIONING0, negative: conditioning.negative }
     }
 
     render = (props: {

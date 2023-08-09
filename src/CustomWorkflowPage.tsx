@@ -142,12 +142,9 @@ const ExecuteCustomWorkflow = (config: {
                         },
                         config.resources
                     )
-                    if (res.positive) {
-                        positiveCondioning = res.positive
-                    }
-                    if (res.negative) {
-                        negativeCondioning = res.negative
-                    }
+
+                    positiveCondioning = res.positive
+                    negativeCondioning = res.negative
                 }
             }
         }

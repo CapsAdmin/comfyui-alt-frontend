@@ -2,6 +2,7 @@ import { ComfyResources } from "../Api/Api"
 import { NodeLink } from "../Api/Nodes"
 import { Config } from "../CustomWorkflowPage"
 
+export type ConditioningArgument = { positive: NodeLink; negative: NodeLink }
 export abstract class BaseConditioner {
     abstract title: string
     abstract config: { [key: string]: any }
@@ -19,10 +20,7 @@ export abstract class BaseConfigConditioner extends BaseConditioner {
 export abstract class BaseConditioningConditioner extends BaseConditioner {
     abstract type: "conditioner"
     abstract apply(
-        conditioning: { positive: NodeLink; negative: NodeLink },
+        conditioning: ConditioningArgument,
         resources: ComfyResources
-    ): {
-        positive: NodeLink
-        negative?: NodeLink
-    }
+    ): ConditioningArgument
 }

@@ -13,9 +13,11 @@ import {
 } from "../Api/Nodes"
 import { ImageUploadZone } from "../components/ImageUploadZone"
 import { LabeledCheckbox } from "../components/LabeledCheckbox"
-import { BaseConditioningConditioner } from "./Base"
+import { BaseConditioningConditioner, ConditioningArgument } from "./Base"
 
 let timerId: number
+
+export type ImagePreprocessor = (input: { image: NodeLink }) => { readonly IMAGE0: NodeLink }
 
 export type PropConfig =
     | {
@@ -37,7 +39,7 @@ export abstract class ControlNetPreprocessorBase extends BaseConditioningConditi
     type = "conditioner" as const
 
     abstract propConfig?: { [key: string]: PropConfig }
-    abstract PreProcessor: (input: { image: NodeLink }) => { IMAGE0: NodeLink }
+    abstract PreProcessor: ImagePreprocessor
     abstract checkPoint: string
 
     _config = {
@@ -88,7 +90,7 @@ export abstract class ControlNetPreprocessorBase extends BaseConditioningConditi
         }).IMAGE0
     }
 
-    apply(conditioning: { positive: NodeLink; negative: NodeLink }, resources: ComfyResources) {
+    apply(conditioning: ConditioningArgument, resources: ComfyResources) {
         const image = LoadImage({
             image: this.config.image!.name,
         }).IMAGE0

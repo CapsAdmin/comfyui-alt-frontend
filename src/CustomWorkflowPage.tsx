@@ -30,6 +30,7 @@ import {
     LoadImage,
     LoraLoader,
     PreviewImage,
+    TomePatchModel,
     VAEDecode,
     VAEEncode,
 } from "./Api/Nodes"
@@ -60,6 +61,7 @@ const ExecuteCustomWorkflow = (config: {
     samplingMethod: string
     samplingScheduler: string
     samplingSteps: number
+    tomeRatio: number
 
     width: number
     height: number
@@ -120,6 +122,13 @@ const ExecuteCustomWorkflow = (config: {
             })
             clip = loraModel.CLIP1
             model = loraModel.MODEL0
+        }
+
+        if (config.tomeRatio != 0) {
+            model = TomePatchModel({
+                model: model,
+                ratio: config.tomeRatio,
+            }).MODEL0
         }
 
         let positiveCondioning = CLIPTextEncode({
@@ -402,6 +411,7 @@ export function CustomWorkflowPage() {
         samplingMethod: "euler",
         samplingScheduler: "normal",
         samplingSteps: 20,
+        tomeRatio: 0,
         width: 512,
         height: 512,
         cfgScale: 7.5,
@@ -462,6 +472,15 @@ export function CustomWorkflowPage() {
                                         max={10000000000000}
                                         step={1}
                                         label="Noise Seed"
+                                    />
+
+                                    <LabeledSlider
+                                        value={config.tomeRatio}
+                                        onChange={(v) => setConfig({ ...config, tomeRatio: v })}
+                                        min={0}
+                                        max={1}
+                                        step={0.01}
+                                        label="Token Merging Ratio"
                                     />
                                 </Stack>
                             </Box>

@@ -1,11 +1,7 @@
 export type NodeLink = [string, number]
 
 let id = 0
-let workflow = { version: 0.4, nodes: [], output: {} } as {
-    version: number
-    nodes: any
-    output: any
-}
+let workflow = { version: 0.4, nodes: [], output: {} }
 
 const StartNodeContext = () => {
     id = 0
@@ -13,7 +9,6 @@ const StartNodeContext = () => {
 }
 
 const EndNodeContext = () => {
-    console.log(workflow)
     return workflow
 }
 
@@ -981,6 +976,30 @@ export const Canny = (input: {
     return node
 }
 
+export const ReferenceOnlySimple = (input: {
+    ["model"]: "MODEL" | NodeLink
+    ["reference"]: "LATENT" | NodeLink
+    ["batch_size"]: number | NodeLink
+}) => {
+    const node = {
+        MODEL0: [id.toString(), 0] as NodeLink,
+        LATENT1: [id.toString(), 1] as NodeLink,
+    } as const
+    addNode("ReferenceOnlySimple", node, input)
+    return node
+}
+
+export const RescaleClassifierFreeGuidanceTest = (input: {
+    ["model"]: "MODEL" | NodeLink
+    ["multiplier"]: number | NodeLink
+}) => {
+    const node = {
+        MODEL0: [id.toString(), 0] as NodeLink,
+    } as const
+    addNode("RescaleClassifierFreeGuidanceTest", node, input)
+    return node
+}
+
 export const RecommendedResCalc = (input: {
     ["desiredXSIZE"]: number | NodeLink
     ["desiredYSIZE"]: number | NodeLink
@@ -992,6 +1011,39 @@ export const RecommendedResCalc = (input: {
         FLOAT3: [id.toString(), 3] as NodeLink,
     } as const
     addNode("RecommendedResCalc", node, input)
+    return node
+}
+
+export const ModelSamplerTonemapNoiseTest = (input: {
+    ["model"]: "MODEL" | NodeLink
+    ["multiplier"]: number | NodeLink
+}) => {
+    const node = {
+        MODEL0: [id.toString(), 0] as NodeLink,
+    } as const
+    addNode("ModelSamplerTonemapNoiseTest", node, input)
+    return node
+}
+
+export const SEECoderImageEncode = (input: {
+    ["seecoder_name"]: string | NodeLink
+    ["image"]: string | "IMAGE" | NodeLink
+}) => {
+    const node = {
+        CONDITIONING0: [id.toString(), 0] as NodeLink,
+    } as const
+    addNode("SEECoderImageEncode", node, input)
+    return node
+}
+
+export const ConcatConditioning = (input: {
+    ["conditioning_to"]: "CONDITIONING" | NodeLink
+    ["conditioning_from"]: "CONDITIONING" | NodeLink
+}) => {
+    const node = {
+        CONDITIONING0: [id.toString(), 0] as NodeLink,
+    } as const
+    addNode("ConcatConditioning", node, input)
     return node
 }
 
@@ -1252,5 +1304,232 @@ export const InpaintPreprocessor = (input: {
         IMAGE0: [id.toString(), 0] as NodeLink,
     } as const
     addNode("InpaintPreprocessor", node, input)
+    return node
+}
+
+export const BNK_CutoffBasePrompt = (input: {
+    ["text"]: string | NodeLink
+    ["clip"]: "CLIP" | NodeLink
+}) => {
+    const node = {
+        CLIPREGION0: [id.toString(), 0] as NodeLink,
+    } as const
+    addNode("BNK_CutoffBasePrompt", node, input)
+    return node
+}
+
+export const BNK_CutoffSetRegions = (input: {
+    ["clip_regions"]: "CLIPREGION" | NodeLink
+    ["region_text"]: string | NodeLink
+    ["target_text"]: string | NodeLink
+    ["weight"]: number | NodeLink
+}) => {
+    const node = {
+        CLIPREGION0: [id.toString(), 0] as NodeLink,
+    } as const
+    addNode("BNK_CutoffSetRegions", node, input)
+    return node
+}
+
+export const BNK_CutoffRegionsToConditioning = (input: {
+    ["clip_regions"]: "CLIPREGION" | NodeLink
+    ["mask_token"]: string | NodeLink
+    ["strict_mask"]: number | NodeLink
+    ["start_from_masked"]: number | NodeLink
+}) => {
+    const node = {
+        CONDITIONING0: [id.toString(), 0] as NodeLink,
+    } as const
+    addNode("BNK_CutoffRegionsToConditioning", node, input)
+    return node
+}
+
+export const BNK_CutoffRegionsToConditioning_ADV = (input: {
+    ["clip_regions"]: "CLIPREGION" | NodeLink
+    ["mask_token"]: string | NodeLink
+    ["strict_mask"]: number | NodeLink
+    ["start_from_masked"]: number | NodeLink
+    ["token_normalization"]: "none" | "mean" | "length" | "length+mean" | NodeLink
+    ["weight_interpretation"]: "comfy" | "A1111" | "compel" | "comfy++" | NodeLink
+}) => {
+    const node = {
+        CONDITIONING0: [id.toString(), 0] as NodeLink,
+    } as const
+    addNode("BNK_CutoffRegionsToConditioning_ADV", node, input)
+    return node
+}
+
+export const KRestartSamplerSimple = (input: {
+    ["model"]: "MODEL" | NodeLink
+    ["seed"]: number | NodeLink
+    ["steps"]: number | NodeLink
+    ["cfg"]: number | NodeLink
+    ["sampler_name"]: string | NodeLink
+    ["scheduler"]: "normal" | "karras" | "exponential" | "simple" | "ddim_uniform" | NodeLink
+    ["positive"]: "CONDITIONING" | NodeLink
+    ["negative"]: "CONDITIONING" | NodeLink
+    ["latent_image"]: "LATENT" | NodeLink
+    ["denoise"]: number | NodeLink
+    ["segments"]: string | NodeLink
+}) => {
+    const node = {
+        LATENT0: [id.toString(), 0] as NodeLink,
+    } as const
+    addNode("KRestartSamplerSimple", node, input)
+    return node
+}
+
+export const KRestartSampler = (input: {
+    ["model"]: "MODEL" | NodeLink
+    ["seed"]: number | NodeLink
+    ["steps"]: number | NodeLink
+    ["cfg"]: number | NodeLink
+    ["sampler_name"]: string | NodeLink
+    ["scheduler"]: "normal" | "karras" | "exponential" | "simple" | "ddim_uniform" | NodeLink
+    ["positive"]: "CONDITIONING" | NodeLink
+    ["negative"]: "CONDITIONING" | NodeLink
+    ["latent_image"]: "LATENT" | NodeLink
+    ["denoise"]: number | NodeLink
+    ["segments"]: string | NodeLink
+    ["restart_scheduler"]:
+        | "normal"
+        | "karras"
+        | "exponential"
+        | "simple"
+        | "ddim_uniform"
+        | "simple_test"
+        | NodeLink
+}) => {
+    const node = {
+        LATENT0: [id.toString(), 0] as NodeLink,
+    } as const
+    addNode("KRestartSampler", node, input)
+    return node
+}
+
+export const AITemplateLoader = (input: {
+    ["model"]: "MODEL" | NodeLink
+    ["keep_loaded"]: "enable" | "disable" | NodeLink
+}) => {
+    const node = {
+        MODEL0: [id.toString(), 0] as NodeLink,
+    } as const
+    addNode("AITemplateLoader", node, input)
+    return node
+}
+
+export const AITemplateControlNetLoader = (input: {
+    ["control_net"]: "CONTROL_NET" | NodeLink
+    ["keep_loaded"]: "enable" | "disable" | NodeLink
+}) => {
+    const node = {
+        CONTROL_NET0: [id.toString(), 0] as NodeLink,
+    } as const
+    addNode("AITemplateControlNetLoader", node, input)
+    return node
+}
+
+export const AITemplateVAEDecode = (input: {
+    ["vae"]: "VAE" | NodeLink
+    ["keep_loaded"]: "enable" | "disable" | NodeLink
+    ["samples"]: "LATENT" | NodeLink
+}) => {
+    const node = {
+        IMAGE0: [id.toString(), 0] as NodeLink,
+    } as const
+    addNode("AITemplateVAEDecode", node, input)
+    return node
+}
+
+export const AITemplateVAEEncode = (input: {
+    ["pixels"]: "IMAGE" | NodeLink
+    ["vae"]: "VAE" | NodeLink
+    ["keep_loaded"]: "enable" | "disable" | NodeLink
+}) => {
+    const node = {
+        LATENT0: [id.toString(), 0] as NodeLink,
+    } as const
+    addNode("AITemplateVAEEncode", node, input)
+    return node
+}
+
+export const AITemplateVAEEncodeForInpaint = (input: {
+    ["pixels"]: "IMAGE" | NodeLink
+    ["vae"]: "VAE" | NodeLink
+    ["mask"]: "MASK" | NodeLink
+    ["grow_mask_by"]: number | NodeLink
+    ["keep_loaded"]: "enable" | "disable" | NodeLink
+}) => {
+    const node = {
+        LATENT0: [id.toString(), 0] as NodeLink,
+    } as const
+    addNode("AITemplateVAEEncodeForInpaint", node, input)
+    return node
+}
+
+export const AITemplateEmptyLatentImage = (input: {
+    ["width"]: number | NodeLink
+    ["height"]: number | NodeLink
+    ["batch_size"]: number | NodeLink
+}) => {
+    const node = {
+        LATENT0: [id.toString(), 0] as NodeLink,
+    } as const
+    addNode("AITemplateEmptyLatentImage", node, input)
+    return node
+}
+
+export const AITemplateLatentUpscale = (input: {
+    ["samples"]: "LATENT" | NodeLink
+    ["upscale_method"]: "nearest-exact" | "bilinear" | "area" | "bicubic" | "bislerp" | NodeLink
+    ["width"]: number | NodeLink
+    ["height"]: number | NodeLink
+    ["crop"]: "disabled" | "center" | NodeLink
+}) => {
+    const node = {
+        LATENT0: [id.toString(), 0] as NodeLink,
+    } as const
+    addNode("AITemplateLatentUpscale", node, input)
+    return node
+}
+
+export const ModelMergeBlockNumber = (input: {
+    ["model1"]: "MODEL" | NodeLink
+    ["model2"]: "MODEL" | NodeLink
+    ["time_embed."]: number | NodeLink
+    ["label_emb."]: number | NodeLink
+    ["input_blocks.0."]: number | NodeLink
+    ["input_blocks.1."]: number | NodeLink
+    ["input_blocks.2."]: number | NodeLink
+    ["input_blocks.3."]: number | NodeLink
+    ["input_blocks.4."]: number | NodeLink
+    ["input_blocks.5."]: number | NodeLink
+    ["input_blocks.6."]: number | NodeLink
+    ["input_blocks.7."]: number | NodeLink
+    ["input_blocks.8."]: number | NodeLink
+    ["input_blocks.9."]: number | NodeLink
+    ["input_blocks.10."]: number | NodeLink
+    ["input_blocks.11."]: number | NodeLink
+    ["middle_block.0."]: number | NodeLink
+    ["middle_block.1."]: number | NodeLink
+    ["middle_block.2."]: number | NodeLink
+    ["output_blocks.0."]: number | NodeLink
+    ["output_blocks.1."]: number | NodeLink
+    ["output_blocks.2."]: number | NodeLink
+    ["output_blocks.3."]: number | NodeLink
+    ["output_blocks.4."]: number | NodeLink
+    ["output_blocks.5."]: number | NodeLink
+    ["output_blocks.6."]: number | NodeLink
+    ["output_blocks.7."]: number | NodeLink
+    ["output_blocks.8."]: number | NodeLink
+    ["output_blocks.9."]: number | NodeLink
+    ["output_blocks.10."]: number | NodeLink
+    ["output_blocks.11."]: number | NodeLink
+    ["out."]: number | NodeLink
+}) => {
+    const node = {
+        MODEL0: [id.toString(), 0] as NodeLink,
+    } as const
+    addNode("ModelMergeBlockNumber", node, input)
     return node
 }

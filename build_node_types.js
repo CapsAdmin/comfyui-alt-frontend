@@ -4,7 +4,7 @@ const res = await fetch("http://127.0.0.1:8188/object_info")
 const nodes = await res.json()
 delete nodes.EmptySegs
 let out = `
-type Link = [string, number]
+export type NodeLink = [string, number]
 
 let id = 0
 let workflow = {version: 0.4, nodes: [], output: {}}
@@ -81,24 +81,24 @@ const emitNode = (name, node) => {
     out += `export const ${jsname} = (input: `
     out += `{\n`
     for (const [name, prop] of Object.entries(node.input.required)) {
-        out += `        ["${name}"]: ${emitProp(name, prop)} | Link\n`
+        out += `        ["${name}"]: ${emitProp(name, prop)} | NodeLink\n`
     }
     if (node.input.optional) {
         for (const [name, prop] of Object.entries(node.input.optional)) {
-            out += `        ["${name}"]?: ${emitProp(name, prop)} | Link\n`
+            out += `        ["${name}"]?: ${emitProp(name, prop)} | NodeLink\n`
         }
     }
     out += `}) => {\n`
     out += `    const node = {\n`
     let i = 0
     for (const prop of node.output) {
-        out += `        ${prop}${i}: [id.toString(), ${i}] as Link,\n`
+        out += `        ${prop}${i}: [id.toString(), ${i}] as NodeLink,\n`
         i++
     }
     out += `    } as const\n`
     out += `    addNode("${name}", node, input)\n`
-    out += `    return node;\n`
-    out += `};\n\n`
+    out += `    return node\n`
+    out += `}\n\n`
 }
 
 for (const [name, node] of Object.entries(nodes)) {

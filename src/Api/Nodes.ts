@@ -1,7 +1,11 @@
 export type NodeLink = [string, number]
 
 let id = 0
-let workflow = { version: 0.4, nodes: [], output: {} }
+let workflow = { version: 0.4, nodes: [], output: {} } as {
+    version: number
+    nodes: any
+    output: any
+}
 
 const StartNodeContext = () => {
     id = 0

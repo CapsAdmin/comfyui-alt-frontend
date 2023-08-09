@@ -16,7 +16,11 @@ import {
 import { Config } from "../CustomWorkflowPage"
 import { ImageUploadZone } from "../components/ImageUploadZone"
 import { LabeledCheckbox } from "../components/LabeledCheckbox"
-import { BaseConditioningConditioner, BaseConfigConditioner, ConditioningArgument } from "./Base"
+import {
+    BaseWorkflowConditioningModifier,
+    BaseWorkflowConfigModifier,
+    ConditioningArgument,
+} from "./Base"
 import { ControlNetPreprocessorBase, ImagePreprocessor } from "./ControlNetBase"
 
 export class ControlNetCannyEdge extends ControlNetPreprocessorBase {
@@ -56,7 +60,7 @@ export class ControlNetLineArt extends ControlNetPreprocessorBase {
     }
 }
 
-export class ClipVision extends BaseConditioningConditioner {
+export class ClipVision extends BaseWorkflowConditioningModifier {
     title = "Clip Vision"
     type = "conditioner" as const
     config = {
@@ -122,7 +126,7 @@ export class ClipVision extends BaseConditioningConditioner {
     }
 }
 
-export class ImageToImage extends BaseConfigConditioner {
+export class ImageToImage extends BaseWorkflowConfigModifier {
     title = "Image To Image"
     type = "config" as const
     config = {

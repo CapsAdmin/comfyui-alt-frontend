@@ -13,7 +13,7 @@ import {
 } from "../Api/Nodes"
 import { ImageUploadZone } from "../components/ImageUploadZone"
 import { LabeledCheckbox } from "../components/LabeledCheckbox"
-import { BaseConditioningConditioner, ConditioningArgument } from "./Base"
+import { BaseWorkflowConditioningModifier, ConditioningArgument } from "./Base"
 
 let timerId: number
 
@@ -34,7 +34,7 @@ export type PropConfig =
           value: any
       }
 
-export abstract class ControlNetPreprocessorBase extends BaseConditioningConditioner {
+export abstract class ControlNetPreprocessorBase extends BaseWorkflowConditioningModifier {
     title = "controlnet-preprocessor"
     type = "conditioner" as const
 
@@ -49,7 +49,7 @@ export abstract class ControlNetPreprocessorBase extends BaseConditioningConditi
         preProcess: true,
         image: undefined as ComfyFile | undefined,
         overlayImage: undefined as ComfyFile | undefined,
-    }
+    } as { [key: string]: any } // TODO: fix type
 
     get config() {
         const out = { ...this._config }
@@ -57,7 +57,7 @@ export abstract class ControlNetPreprocessorBase extends BaseConditioningConditi
         if (this.propConfig) {
             for (const key in this.propConfig) {
                 if (key in out) continue
-                const value = this.propConfig[key as keyof typeof this.propConfig]
+                const value = this.propConfig[key]
                 out[key] = value.value
             }
         }
@@ -81,8 +81,6 @@ export abstract class ControlNetPreprocessorBase extends BaseConditioningConditi
                 keyValues[key] = this.config[key as keyof typeof this.config]
             }
         }
-
-        console.log(image, "!!")
 
         return this.PreProcessor({
             image: image,
@@ -136,6 +134,7 @@ export abstract class ControlNetPreprocessorBase extends BaseConditioningConditi
                     return
                 }
 
+                // eslint-disable-next-line @typescript-eslint/no-extra-semi
                 ;(async () => {
                     const res = await api.executePrompt(
                         0,

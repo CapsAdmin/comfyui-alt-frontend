@@ -34,14 +34,14 @@ import {
     VAEEncode,
 } from "./Api/Nodes"
 import { LabeledSlider } from "./components/LabeledSlider"
+import { PreprocessPrompts } from "./utils/prompts"
 import {
     ClipVision,
     ControlNetCannyEdge,
     ControlNetDepth,
     ControlNetLineArt,
     ImageToImage,
-} from "./conditioners/Conditioners"
-import { PreprocessPrompts } from "./utils/prompts"
+} from "./workflow_modifiers/WorkflowModifiers"
 
 const availableConditioners = [
     ClipVision,

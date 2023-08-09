@@ -9,6 +9,7 @@ import {
     ConditioningAverage_,
     LineArtPreprocessor,
     LoadImage,
+    NodeLink,
     StyleModelApply,
     StyleModelLoader,
     Zoe_DepthMapPreprocessor,
@@ -16,7 +17,7 @@ import {
 import { Config } from "../CustomWorkflowPage"
 import { ImageUploadZone } from "../components/ImageUploadZone"
 import { LabeledCheckbox } from "../components/LabeledCheckbox"
-import { BaseConditioner } from "./Base"
+import { BaseConditioningConditioner, BaseConfigConditioner } from "./Base"
 import { ControlNetPreprocessorBase } from "./ControlNetBase"
 
 export class ControlNetCannyEdge extends ControlNetPreprocessorBase {
@@ -56,44 +57,50 @@ export class ControlNetLineArt extends ControlNetPreprocessorBase {
     }
 }
 
-export class ClipVision extends BaseConditioner {
+export class ClipVision extends BaseConditioningConditioner {
     title = "Clip Vision"
     type = "conditioner" as const
     config = {
         strength: 1,
         image: undefined as ComfyFile | undefined,
     }
-    apply(conditioning: { CONDITIONING0: any }, resources: ComfyResources) {
+    apply(
+        conditioning: {
+            positive: NodeLink
+            negative: NodeLink
+        },
+        resources: ComfyResources
+    ) {
         const image = LoadImage({
             image: this.config.image!.name,
-        })
+        }).IMAGE0
 
         const clipVisionModel = CLIPVisionLoader({
             clip_name: "clip-vit-large-patch14.bin",
-        })
+        }).CLIP_VISION0
 
         const styleModel = StyleModelLoader({
             style_model_name: "t2iadapter_style_sd14v1.pth",
-        })
+        }).STYLE_MODEL0
 
         const clipVisionEncoder = CLIPVisionEncode({
-            image: image.IMAGE0,
-            clip_vision: clipVisionModel.CLIP_VISION0,
-        })
+            image: image,
+            clip_vision: clipVisionModel,
+        }).CLIP_VISION_OUTPUT0
 
         const applier = StyleModelApply({
-            style_model: styleModel.STYLE_MODEL0,
-            clip_vision_output: clipVisionEncoder.CLIP_VISION_OUTPUT0,
-            conditioning: conditioning.CONDITIONING0,
+            style_model: styleModel,
+            clip_vision_output: clipVisionEncoder,
+            conditioning: conditioning.positive,
         })
 
         const averager = ConditioningAverage_({
             conditioning_to: applier.CONDITIONING0,
-            conditioning_from: conditioning.CONDITIONING0,
+            conditioning_from: conditioning.positive,
             conditioning_to_strength: this.config.strength,
         })
 
-        return averager
+        return { positive: averager.CONDITIONING0, negative: undefined }
     }
 
     render = (props: {
@@ -122,7 +129,7 @@ export class ClipVision extends BaseConditioner {
     }
 }
 
-export class ImageToImage extends BaseConditioner {
+export class ImageToImage extends BaseConfigConditioner {
     title = "Image To Image"
     type = "config" as const
     config = {

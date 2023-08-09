@@ -5,14 +5,15 @@ import { useEffect, useState } from "react"
 import { ComfyFile, ComfyResources, api } from "../Api/Api"
 import {
     BuildWorkflow,
-    ControlNetApply,
+    ControlNetApplyAdvanced,
     ControlNetLoader,
     LoadImage,
+    NodeLink,
     PreviewImage,
 } from "../Api/Nodes"
 import { ImageUploadZone } from "../components/ImageUploadZone"
 import { LabeledCheckbox } from "../components/LabeledCheckbox"
-import { BaseConditioner } from "./Base"
+import { BaseConditioningConditioner } from "./Base"
 
 let timerId: number
 
@@ -31,16 +32,18 @@ export type PropConfig =
           value: any
       }
 
-export abstract class ControlNetPreprocessorBase extends BaseConditioner {
+export abstract class ControlNetPreprocessorBase extends BaseConditioningConditioner {
     title = "controlnet-preprocessor"
     type = "conditioner" as const
 
     abstract propConfig?: { [key: string]: PropConfig }
-    abstract PreProcessor: (input: any) => { IMAGE0: any }
+    abstract PreProcessor: (input: { image: NodeLink }) => { IMAGE0: NodeLink }
     abstract checkPoint: string
 
     _config = {
         strength: 1,
+        startPercent: 0,
+        stopPercent: 1,
         preProcess: true,
         image: undefined as ComfyFile | undefined,
         overlayImage: undefined as ComfyFile | undefined,
@@ -64,33 +67,31 @@ export abstract class ControlNetPreprocessorBase extends BaseConditioner {
         this._config = value
     }
 
-    runPreprocessor(image: any) {
+    runPreprocessor(image: NodeLink) {
         if (!this.config.preProcess) {
             return image
         }
 
-        if (!this.propConfig) {
-            return this.PreProcessor({
-                image: image.IMAGE0,
-            })
-        }
-
         const keyValues: { [key: string]: any } = {}
 
-        for (const key in this.propConfig) {
-            keyValues[key] = this.config[key as keyof typeof this.config]
+        if (this.propConfig) {
+            for (const key in this.propConfig) {
+                keyValues[key] = this.config[key as keyof typeof this.config]
+            }
         }
 
+        console.log(image, "!!")
+
         return this.PreProcessor({
-            image: image.IMAGE0,
+            image: image,
             ...keyValues,
-        })
+        }).IMAGE0
     }
 
-    apply(conditioning: { CONDITIONING0: any }, resources: ComfyResources) {
+    apply(conditioning: { positive: NodeLink; negative: NodeLink }, resources: ComfyResources) {
         const image = LoadImage({
-            image: this.config.image?.name,
-        })
+            image: this.config.image!.name,
+        }).IMAGE0
 
         const model = ControlNetLoader({
             control_net_name: this.checkPoint,
@@ -98,12 +99,20 @@ export abstract class ControlNetPreprocessorBase extends BaseConditioner {
 
         const processor = this.runPreprocessor(image)
 
-        return ControlNetApply({
+        const res = ControlNetApplyAdvanced({
             control_net: model.CONTROL_NET0,
-            image: processor.IMAGE0,
+            image: processor,
             strength: this.config.strength,
-            conditioning: conditioning.CONDITIONING0,
+            positive: conditioning.positive,
+            negative: conditioning.negative,
+            start_percent: this.config.startPercent,
+            end_percent: this.config.stopPercent,
         })
+
+        return {
+            positive: res.CONDITIONING0,
+            negative: res.CONDITIONING1,
+        }
     }
 
     render = (props: {
@@ -131,12 +140,14 @@ export abstract class ControlNetPreprocessorBase extends BaseConditioner {
                         BuildWorkflow(() => {
                             const image = LoadImage({
                                 image: filename,
-                            })
+                            }).IMAGE0
 
-                            const processor = this.runPreprocessor(image)
+                            const processedImage = this.runPreprocessor(image)
+
+                            console.log(processedImage)
 
                             PreviewImage({
-                                images: processor.IMAGE0,
+                                images: processedImage,
                             })
                         })
                     )
@@ -175,6 +186,24 @@ export abstract class ControlNetPreprocessorBase extends BaseConditioner {
                         max={5}
                         step={0.01}
                         label="Strength"
+                    />
+
+                    <LabeledSlider
+                        value={props.value.startPercent}
+                        onChange={(v) => props.onChange({ ...props.value, startPercent: v })}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        label="Start Precent"
+                    />
+
+                    <LabeledSlider
+                        value={props.value.stopPercent}
+                        onChange={(v) => props.onChange({ ...props.value, stopPercent: v })}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        label="Stop Precent"
                     />
 
                     <LabeledCheckbox

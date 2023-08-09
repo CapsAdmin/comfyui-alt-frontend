@@ -97,65 +97,78 @@ const ExecuteCustomWorkflow = (config: {
             ckpt_name: config.checkpoint,
         })
 
-        let model: { MODEL0: [string, number] } = checkpoint
+        let model = checkpoint.MODEL0
+        const vae = checkpoint.VAE2
 
         for (const { path, weight } of hypernetworks) {
             model = HypernetworkLoader({
                 hypernetwork_name: path,
-                model: model.MODEL0,
+                model: model,
                 strength: weight,
-            })
+            }).MODEL0
         }
 
-        let clip: { CLIP1: [string, number] } = checkpoint
+        let clip = checkpoint.CLIP1
 
         for (const { path, weight } of loras) {
             const loraModel = LoraLoader({
                 lora_name: path,
-                model: model.MODEL0,
-                clip: clip.CLIP1,
+                model: model,
+                clip: clip,
                 strength_clip: weight,
                 strength_model: weight,
             })
-            clip = loraModel
-            model = loraModel
+            clip = loraModel.CLIP1
+            model = loraModel.MODEL0
         }
 
         let positiveCondioning = CLIPTextEncode({
             text: positive,
-            clip: clip.CLIP1,
-        })
+            clip: clip,
+        }).CONDITIONING0
+
+        let negativeCondioning = CLIPTextEncode({
+            text: negative,
+            clip: clip,
+        }).CONDITIONING0
 
         if (config.conditioners) {
             for (const conditioner of config.conditioners) {
                 if (conditioner.type == "conditioner") {
-                    positiveCondioning = conditioner.apply(positiveCondioning, config.resources)
+                    const res = conditioner.apply(
+                        {
+                            positive: positiveCondioning,
+                            negative: negativeCondioning,
+                        },
+                        config.resources
+                    )
+                    if (res.positive) {
+                        positiveCondioning = res.positive
+                    }
+                    if (res.negative) {
+                        negativeCondioning = res.negative
+                    }
                 }
             }
         }
-
-        const negativeCondioning = CLIPTextEncode({
-            text: negative,
-            clip: clip.CLIP1,
-        })
 
         let latent
         if (config.image) {
             const image = LoadImage({
                 image: config.image.name,
-            })
+            }).IMAGE0
 
             const resized = ImageScale({
-                image: image.IMAGE0,
+                image: image,
                 width: config.width,
                 height: config.height,
                 upscale_method: "bicubic",
                 crop: config.imageCrop ? "center" : "disabled",
-            })
+            }).IMAGE0
 
             latent = VAEEncode({
-                pixels: resized.IMAGE0,
-                vae: checkpoint.VAE2,
+                pixels: resized,
+                vae: vae,
             })
         } else {
             latent = EmptyLatentImage({
@@ -175,12 +188,12 @@ const ExecuteCustomWorkflow = (config: {
                     denoise: config.imageDenoise || 1,
                     seed: config.seed,
 
-                    model: model.MODEL0,
-                    positive: positiveCondioning.CONDITIONING0,
-                    negative: negativeCondioning.CONDITIONING0,
+                    model: model,
+                    positive: positiveCondioning,
+                    negative: negativeCondioning,
                     latent_image: latent.LATENT0,
                 }).LATENT0,
-                vae: checkpoint.VAE2,
+                vae: vae,
             }).IMAGE0,
         })
     })
@@ -191,7 +204,7 @@ export type Config = Parameters<typeof ExecuteCustomWorkflow>[0]
 let CONDITIONER_ID = 0
 
 function AddConditioner(props: {
-    onAdd: (conditioner: (typeof availableConditioners)[number], id: number) => void
+    onAdd: (conditioner: InstanceType<(typeof availableConditioners)[number]>) => void
 }) {
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
     const open = Boolean(anchorEl)
@@ -216,17 +229,20 @@ function AddConditioner(props: {
                     "aria-labelledby": "basic-button",
                 }}
             >
-                {availableConditioners.map((v, i) => (
-                    <MenuItem
-                        key={v.name}
-                        onClick={() => {
-                            props.onAdd(v, i)
-                            handleClose()
-                        }}
-                    >
-                        {v.name}
-                    </MenuItem>
-                ))}
+                {availableConditioners.map((v, i) => {
+                    const obj = new v(i)
+                    return (
+                        <MenuItem
+                            key={v.name}
+                            onClick={() => {
+                                props.onAdd(obj)
+                                handleClose()
+                            }}
+                        >
+                            {obj.title}
+                        </MenuItem>
+                    )
+                })}
             </Menu>
         </>
     )
@@ -255,7 +271,8 @@ const Conditioners = (props: { config: Config; setConfig: (config: Config) => vo
                     <Box justifyContent={"center"} display={"flex"} flex={1}>
                         <AddConditioner
                             onAdd={(obj) => {
-                                config.conditioners.push(new obj(CONDITIONER_ID++))
+                                obj.id = CONDITIONER_ID++
+                                config.conditioners.push(obj)
                                 setConfig({ ...config })
                             }}
                         ></AddConditioner>
@@ -381,7 +398,7 @@ export function CustomWorkflowPage() {
     const [progress, setProgress] = useState(0)
     const [maxProgress, setMaxProgress] = useState(0)
 
-    let [config, setConfig] = useState<Config>({
+    const [config, setConfig] = useState<Config>({
         checkpoint: "anime/Anything-V3.0-pruned-fp32.ckpt",
         positive: "",
         negative: "",
@@ -397,12 +414,6 @@ export function CustomWorkflowPage() {
         batchCount: 1,
         resources,
     })
-
-    const old = setConfig
-    setConfig = (config) => {
-        old(config)
-        console.log(new Error().stack)
-    }
 
     return (
         <Stack spacing={1} margin={4}>

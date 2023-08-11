@@ -81,7 +81,15 @@ const emitNode = (name, node) => {
     out += `export const ${jsname} = (input: `
     out += `{\n`
     for (const [name, prop] of Object.entries(node.input.required)) {
-        out += `        ["${name}"]: ${emitProp(name, prop)} | NodeLink\n`
+        const info = prop[1]
+        let defaultValue = undefined
+        if (typeof info == "object") {
+            defaultValue = info.default
+        }
+        out += `        ["${name}"]${defaultValue === undefined ? "" : "?"}: ${emitProp(
+            name,
+            prop
+        )} | NodeLink\n`
     }
     if (node.input.optional) {
         for (const [name, prop] of Object.entries(node.input.optional)) {
@@ -89,6 +97,21 @@ const emitNode = (name, node) => {
         }
     }
     out += `}) => {\n`
+
+    for (const [name, prop] of Object.entries(node.input.required)) {
+        const info = prop[1]
+        let defaultValue = undefined
+        if (typeof info == "object") {
+            defaultValue = info.default
+        }
+
+        if (defaultValue !== undefined) {
+            out += `    if (input["${name}"] === undefined) input["${name}"] = ${JSON.stringify(
+                defaultValue
+            )}\n`
+        }
+    }
+
     out += `    const node = {\n`
     let i = 0
     for (const prop of node.output) {

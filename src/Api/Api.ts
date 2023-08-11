@@ -302,7 +302,6 @@ class ComfyApi extends EventTarget {
         }
         prompt_id: string
     }> {
-        console.log("PROMPT:", prompt)
         const progress = (data: any) => {
             const progress = data.detail.value as number
             const max = data.detail.max as number
@@ -468,12 +467,15 @@ api.host = "127.0.0.1:8188"
 api.init()
 export interface ComfyResources {
     checkpoints: string[]
+    vaes: string[]
     embeddings: string[]
     hypernetworks: string[]
     loras: string[]
     controlnets: string[]
     samplingMethods: string[]
     samplingSchedulers: string[]
+    restartSamplingMethods: string[]
+    restartSamplingSchedulers: string[]
     nodes: { [key: string]: ComfyNodeDef }
 }
 
@@ -482,8 +484,11 @@ export const useComfyAPI = () => {
         const nodes = await api.getNodes()
         const embeddings = await api.getEmbeddings()
         const checkpoints = nodes.CheckpointLoaderSimple.input.required.ckpt_name[0]
+        const vaes = nodes.VAELoader.input.required.vae_name[0]
         const samplingMethods = nodes.KSamplerAdvanced.input.required.sampler_name[0]
         const samplingSchedulers = nodes.KSamplerAdvanced.input.required.scheduler[0]
+        const restartSamplingMethods = nodes.KRestartSampler.input.required.sampler_name[0]
+        const restartSamplingSchedulers = nodes.KRestartSampler.input.required.restart_scheduler[0]
         const loras = nodes.LoraLoader.input.required.lora_name[0]
         const hypernetworks = nodes.HypernetworkLoader.input.required.hypernetwork_name[0]
         const controlnets = nodes.ControlNetLoader.input.required.control_net_name[0]
@@ -491,12 +496,15 @@ export const useComfyAPI = () => {
         return {
             nodes,
             checkpoints,
+            vaes,
             embeddings,
             hypernetworks,
             loras,
             controlnets,
             samplingMethods,
             samplingSchedulers,
+            restartSamplingMethods,
+            restartSamplingSchedulers,
         } as ComfyResources
     }, "comfyresources")
 }

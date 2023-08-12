@@ -37,7 +37,6 @@ function jsonToGraphviz(json) {
     }
 
     dotString += "}"
-    console.log(dotString)
     return dotString
 }
 const graphviz = await instance()

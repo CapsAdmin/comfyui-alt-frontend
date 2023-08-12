@@ -14,7 +14,7 @@ export const ImageUploadZone = (props: {
 
     const onDrop = useCallback(
         async (files: Array<File>) => {
-            onImageUpload(await api.uploadFile(files[0]))
+            onImageUpload((await api.uploadFile(files[0]))!)
         },
         [onImageUpload]
     )

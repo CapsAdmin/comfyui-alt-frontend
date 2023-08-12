@@ -20,6 +20,11 @@ export abstract class BaseWorkflowConditioningModifier extends BaseWorkflowModif
     ): ConditioningArgument
 }
 
+export abstract class BaseWorkflowPostprocessModifier extends BaseWorkflowModifier {
+    static type = "postprocess"
+    abstract apply(latentImage: NodeLink, resources: ComfyResources): NodeLink
+}
+
 export const SerializeModifier = (obj: BaseWorkflowModifier) => {
     return JSON.stringify({ ...obj, __class: obj.constructor.name })
 }

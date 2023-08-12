@@ -1,4 +1,6 @@
 import { Add, Delete } from "@mui/icons-material"
+import DirectionsIcon from "@mui/icons-material/Directions"
+import FilterIcon from "@mui/icons-material/Filter"
 import {
     Box,
     Button,
@@ -16,12 +18,14 @@ import {
 } from "@mui/material"
 import MenuItem from "@mui/material/MenuItem"
 import { MouseEvent, useEffect, useRef, useState } from "react"
+import { DragDropContext, Draggable, Droppable } from "react-beautiful-dnd"
 import { ComfyFile, ComfyResources, api, useComfyAPI } from "./Api/Api"
 import {
     BuildWorkflow,
     CLIPSetLastLayer,
     CLIPTextEncode,
     CheckpointLoaderSimple,
+    CollectOutput,
     ConditioningConcat,
     EmptyLatentImage,
     HypernetworkLoader,
@@ -30,7 +34,6 @@ import {
     KSampler,
     LoadImage,
     LoraLoader,
-    PreviewImage,
     ReferenceOnlySimple,
     RescaleClassifierFreeGuidanceTest,
     TomePatchModel,
@@ -41,16 +44,18 @@ import {
 import { LabeledSlider } from "./components/LabeledSlider"
 import { comfyToGraphvizSVG } from "./utils/ComfyToGraphviz"
 import { PreprocessPrompts } from "./utils/prompts"
+import { uniqueObjectId } from "./utils/uid"
 import { DeserializeModifier, SerializeModifier } from "./workflow_modifiers/Base"
 import {
     ClipVision,
     ControlNetCannyEdge,
     ControlNetDepth,
     ControlNetLineArt,
+    FaceSwapper,
+    FaceUpscaler,
     ImageToImage,
     SeeCoder,
 } from "./workflow_modifiers/WorkflowModifiers"
-
 const availableConditioners = [
     ClipVision,
     SeeCoder,
@@ -58,11 +63,13 @@ const availableConditioners = [
     ControlNetDepth,
     ControlNetLineArt,
     ControlNetCannyEdge,
+    FaceUpscaler,
+    FaceSwapper,
 ] as const
 
 console.log(ClipVision.type)
 
-const ExecuteCustomWorkflow = (config: {
+const BuildCustomWorkflow = async (config: {
     checkpoint: string
     vae: string
 
@@ -97,7 +104,9 @@ const ExecuteCustomWorkflow = (config: {
 
     conditioners: Array<InstanceType<(typeof availableConditioners)[number]>>
 }) => {
-    return BuildWorkflow(() => {
+    return await BuildWorkflow(async () => {
+        config = { ...config }
+
         if (config.conditioners) {
             for (const conditioner of config.conditioners) {
                 if (conditioner.type == "config") {
@@ -290,18 +299,24 @@ const ExecuteCustomWorkflow = (config: {
             }).LATENT0
         }
 
-        PreviewImage({
-            images: VAEDecode({
-                samples: resultLatent,
-                vae: vae,
-            }).IMAGE0,
-        })
+        let image = VAEDecode({
+            samples: resultLatent,
+            vae: vae,
+        }).IMAGE0
+
+        if (config.conditioners) {
+            for (const conditioner of config.conditioners) {
+                if (conditioner.type == "postprocess") {
+                    image = conditioner.apply(image, config.resources)
+                }
+            }
+        }
+
+        CollectOutput(image, "final")
     })
 }
 
-export type Config = Parameters<typeof ExecuteCustomWorkflow>[0]
-
-const CONDITIONER_ID = 0
+export type Config = Parameters<typeof BuildCustomWorkflow>[0]
 
 function AddConditioner(props: {
     onAdd: (conditioner: InstanceType<(typeof availableConditioners)[number]>) => void
@@ -329,17 +344,26 @@ function AddConditioner(props: {
                     "aria-labelledby": "basic-button",
                 }}
             >
-                {availableConditioners.map((v, i) => {
-                    const obj = new v(i)
+                {availableConditioners.map((ctor) => {
+                    const obj = new ctor()
+                    let Icon
+                    if (obj.type == "postprocess") {
+                        Icon = FilterIcon
+                    } else {
+                        Icon = DirectionsIcon
+                    }
                     return (
                         <MenuItem
-                            key={v.name}
+                            key={ctor.name}
                             onClick={() => {
                                 props.onAdd(obj)
                                 handleClose()
                             }}
                         >
-                            {obj.title}
+                            <Stack direction="row" spacing={1}>
+                                <Icon />
+                                <Typography>{obj.title}</Typography>
+                            </Stack>
                         </MenuItem>
                     )
                 })}
@@ -353,20 +377,72 @@ const Conditioners = (props: { config: Config; setConfig: (config: Config) => vo
     const setConfig = props.setConfig
     const [selectedConditioner, setSelectedConditioner] = useState<Config["conditioners"][number]>()
 
+    const onDragEnd = (result) => {
+        if (!result.destination) return
+
+        const reorderedItems = Array.from(config.conditioners)
+        const [removed] = reorderedItems.splice(result.source.index, 1)
+        reorderedItems.splice(result.destination.index, 0, removed)
+
+        setConfig({ ...config, conditioners: reorderedItems })
+    }
+
     return (
         <Stack direction="row" spacing={1}>
-            <List>
-                {config.conditioners.map((obj, i) => (
-                    <ListItem
-                        selected={selectedConditioner === obj}
-                        button
-                        key={i}
-                        onClick={() => setSelectedConditioner(obj)}
-                    >
-                        <Typography>{obj.title}</Typography>
-                    </ListItem>
-                ))}
+            <Stack direction="column" spacing={1}>
+                <DragDropContext onDragEnd={onDragEnd}>
+                    <Droppable droppableId="droppable">
+                        {(provided, snapshot) => (
+                            <div {...provided.droppableProps} ref={provided.innerRef}>
+                                <List>
+                                    {config.conditioners.map((obj, i) => {
+                                        let Icon
+                                        if (obj.type == "postprocess") {
+                                            Icon = FilterIcon
+                                        } else {
+                                            Icon = DirectionsIcon
+                                        }
+                                        return (
+                                            <Draggable
+                                                key={uniqueObjectId(obj)}
+                                                draggableId={uniqueObjectId(obj)}
+                                                index={i}
+                                            >
+                                                {(provided, snapshot) => (
+                                                    <div
+                                                        ref={provided.innerRef}
+                                                        {...provided.draggableProps}
+                                                        {...provided.dragHandleProps}
+                                                        style={{
+                                                            ...provided.draggableProps.style,
+                                                            marginBottom: "8px",
+                                                        }}
+                                                    >
+                                                        <ListItem
+                                                            selected={selectedConditioner === obj}
+                                                            button
+                                                            key={i}
+                                                            onClick={() =>
+                                                                setSelectedConditioner(obj)
+                                                            }
+                                                        >
+                                                            <Stack direction="row" spacing={1}>
+                                                                <Icon />
+                                                                <Typography>{obj.title}</Typography>
+                                                            </Stack>
+                                                        </ListItem>
+                                                    </div>
+                                                )}
+                                            </Draggable>
+                                        )
+                                    })}
+                                </List>
 
+                                {provided.placeholder}
+                            </div>
+                        )}
+                    </Droppable>
+                </DragDropContext>
                 <ListItem>
                     <Box justifyContent={"center"} display={"flex"} flex={1}>
                         <AddConditioner
@@ -377,9 +453,9 @@ const Conditioners = (props: { config: Config; setConfig: (config: Config) => vo
                         ></AddConditioner>
                     </Box>
                 </ListItem>
-            </List>
+            </Stack>
             {selectedConditioner && (
-                <Card style={{ position: "relative" }}>
+                <Card style={{ position: "relative", minWidth: 200 }}>
                     <IconButton
                         style={{
                             position: "absolute",
@@ -396,7 +472,7 @@ const Conditioners = (props: { config: Config; setConfig: (config: Config) => vo
                             setSelectedConditioner(config.conditioners[0])
                         }}
                     >
-                        <Delete></Delete>
+                        <Delete />
                     </IconButton>
 
                     <selectedConditioner.render
@@ -458,6 +534,15 @@ const Prompts = (props: { config: Config; setConfig: (config: Config) => void })
                 max={24}
                 step={1}
                 label="Clip skip"
+            />
+
+            <LabeledSlider
+                value={config.tomeRatio}
+                onChange={(v) => setConfig({ ...config, tomeRatio: v })}
+                min={0}
+                max={1}
+                step={0.01}
+                label="Token Merging Ratio"
             />
         </Stack>
     )
@@ -541,6 +626,12 @@ const Sampler = (props: {
     )
 }
 
+let lastOutput = []
+
+export const getLastOutput = () => {
+    return lastOutput
+}
+
 const savedConfig = localStorage.getItem("customWorkflowConfig")
 let loadedConfig = savedConfig == null
 export function CustomWorkflowPage() {
@@ -573,6 +664,79 @@ export function CustomWorkflowPage() {
         batchCount: 1,
         resources,
     })
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const run = async () => {
+        const [graph, imageOutputs] = await BuildCustomWorkflow(config)
+
+        if (graphVizContainer.current) {
+            const svgElement = comfyToGraphvizSVG(graph)
+            for (const child of graphVizContainer.current.children) {
+                graphVizContainer.current.removeChild(child)
+            }
+            graphVizContainer.current.appendChild(svgElement)
+        }
+
+        const res = await api.executePrompt(
+            0,
+            graph,
+            (image) => {
+                if (!imageOutputRef.current) return
+                imageOutputRef.current.src = image
+            },
+            (prog, max) => {
+                setProgress(prog)
+                setMaxProgress(max)
+            },
+            imageOutputs.map((v) => v.node.id.toString())
+        )
+
+        const found = []
+        for (const imageData of imageOutputs) {
+            for (const output of res) {
+                if (imageData.node.id.toString() == output.nodeId.toString()) {
+                    found.push({
+                        nodeId: imageData.node.id,
+                        userdata: imageData.userdata,
+                        images: output.images,
+                    })
+                }
+            }
+        }
+
+        lastOutput = found
+
+        const finalOutput = found.find((v) => v.userdata == "final")
+        if (!finalOutput) {
+            console.error("final output not found")
+            console.log(imageOutputs)
+            console.log(res)
+            console.log(await api.getHistory())
+            return
+        }
+
+        if (!imageOutputRef.current) return
+
+        imageOutputRef.current.src = URL.createObjectURL(
+            await api.view(finalOutput.images[finalOutput.images.length - 1])
+        )
+    }
+
+    useEffect(() => {
+        // listen for ctrl enter
+
+        const listener = (e: KeyboardEvent) => {
+            if (e.ctrlKey && e.key === "Enter") {
+                run()
+            }
+        }
+
+        document.addEventListener("keydown", listener)
+
+        return () => {
+            document.removeEventListener("keydown", listener)
+        }
+    }, [run])
 
     useEffect(() => {
         if (savedConfig) {
@@ -661,38 +825,6 @@ export function CustomWorkflowPage() {
                                         step={1}
                                         label="Noise Seed"
                                     />
-
-                                    <LabeledSlider
-                                        value={config.tomeRatio}
-                                        onChange={(v) => setConfig({ ...config, tomeRatio: v })}
-                                        min={0}
-                                        max={1}
-                                        step={0.01}
-                                        label="Token Merging Ratio"
-                                    />
-                                </Stack>
-                            </Box>
-                        </Card>
-
-                        <Card>
-                            <Box margin={2}>
-                                <Stack direction={"column"} spacing={1}>
-                                    <LabeledSlider
-                                        value={config.width}
-                                        onChange={(v) => setConfig({ ...config, width: v })}
-                                        min={0}
-                                        max={2048}
-                                        step={64}
-                                        label="Width"
-                                    />
-                                    <LabeledSlider
-                                        value={config.height}
-                                        onChange={(v) => setConfig({ ...config, height: v })}
-                                        min={0}
-                                        max={2048}
-                                        step={64}
-                                        label="Height"
-                                    />
                                 </Stack>
                             </Box>
                         </Card>
@@ -704,52 +836,19 @@ export function CustomWorkflowPage() {
                     </Stack>
                 </Stack>
                 <Stack spacing={0.2}>
-                    <Button
-                        fullWidth
-                        variant="contained"
-                        onClick={async () => {
-                            const graph = ExecuteCustomWorkflow(config)
-
-                            if (graphVizContainer.current) {
-                                const svgElement = comfyToGraphvizSVG(graph)
-                                for (const child of graphVizContainer.current.children) {
-                                    graphVizContainer.current.removeChild(child)
-                                }
-                                graphVizContainer.current.appendChild(svgElement)
-                            }
-
-                            const res = await api.executePrompt(
-                                0,
-                                graph,
-                                (image) => {
-                                    if (!imageOutputRef.current) return
-                                    imageOutputRef.current.src = image
-                                },
-                                (prog, max) => {
-                                    setProgress(prog)
-                                    setMaxProgress(max)
-                                }
-                            )
-
-                            if (!imageOutputRef.current) return
-
-                            imageOutputRef.current.src = URL.createObjectURL(
-                                await api.view(res.output.images[res.output.images.length - 1])
-                            )
-                        }}
-                    >
+                    <Button fullWidth variant="contained" onClick={run}>
                         generate
                     </Button>
 
                     <Box display={"flex"}>
                         <img
-                            width={512}
-                            height={512}
                             ref={imageOutputRef}
                             style={{
                                 flex: 1,
                                 marginLeft: "auto",
                                 marginRight: "auto",
+                                minWidth: config.width,
+                                minHeight: config.height,
                             }}
                         />
                     </Box>
@@ -758,6 +857,29 @@ export function CustomWorkflowPage() {
                         variant="determinate"
                         value={(progress / maxProgress) * 100}
                     />
+
+                    <Card>
+                        <Box margin={2}>
+                            <Stack direction={"column"} spacing={1}>
+                                <LabeledSlider
+                                    value={config.width}
+                                    onChange={(v) => setConfig({ ...config, width: v })}
+                                    min={0}
+                                    max={2048}
+                                    step={64}
+                                    label="Width"
+                                />
+                                <LabeledSlider
+                                    value={config.height}
+                                    onChange={(v) => setConfig({ ...config, height: v })}
+                                    min={0}
+                                    max={2048}
+                                    step={64}
+                                    label="Height"
+                                />
+                            </Stack>
+                        </Box>
+                    </Card>
                 </Stack>
             </Stack>
             <Box ref={graphVizContainer}></Box>

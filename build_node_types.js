@@ -7,34 +7,48 @@ let out = `
 export type NodeLink = [string, number]
 
 let id = 0
-let workflow = {version: 0.4, nodes: [], output: {}}
-
+let workflow = { version: 0.4, nodes: [], output: {} }
+let outputs: Array<{ image: NodeLink; node: any; userdata: any }> = []
 const StartNodeContext = () => {
-	id = 0
-	workflow = {version: 0.4, nodes: [], output: {}}
+    id = 0
+    workflow = { version: 0.4, nodes: [], output: {} }
+    outputs = []
 }
 
 const EndNodeContext = () => {
-	return workflow
+    return [workflow, outputs] as const
+}
+
+export const CollectOutput = (image: NodeLink, userdata?: any) => {
+    outputs.push({ image: image, node: undefined, userdata: userdata })
+    return image
 }
 
 const addNode = (type: string, node: any, input: any) => {
-	node.id = id++
-	node.type = type
+    node.id = id++
+    node.type = type
 
-	workflow.output[node.id] = {
-		class_type: node.type,
-		inputs: input,
-	}
+    workflow.output[node.id] = {
+        class_type: node.type,
+        inputs: input,
+    }
 
-	workflow.nodes.push(node)
+    workflow.nodes.push(node)
 }
 
-export const BuildWorkflow = (fn: () => void) => {
-	StartNodeContext()
-	fn()
-	return EndNodeContext()
+export const BuildWorkflow = async (fn: () => Promise<void>) => {
+    StartNodeContext()
+    await fn()
+
+    for (const outputImage of outputs) {
+        outputImage.node = PreviewImage({
+            images: outputImage.image,
+        })
+    }
+
+    return EndNodeContext()
 }
+
 
 `
 
@@ -48,6 +62,9 @@ const emitProp = (name, prop) => {
     }
 
     const type = prop[0]
+    if (type == "BOOLEAN") {
+        return "boolean"
+    }
     if (type == "INT" || type == "FLOAT") {
         return "number"
     } else if (type == "STRING") {
@@ -115,7 +132,7 @@ const emitNode = (name, node) => {
     out += `    const node = {\n`
     let i = 0
     for (const prop of node.output) {
-        out += `        ${prop}${i}: [id.toString(), ${i}] as NodeLink,\n`
+        out += `        ["${prop}${i}"]: [id.toString(), ${i}] as NodeLink,\n`
         i++
     }
     out += `    } as const\n`

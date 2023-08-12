@@ -285,23 +285,25 @@ class ComfyApi extends EventTarget {
     }
 
     awaitingPrompts = new Map<string, any>()
+    captured = new Map<string, any>()
+    startedCapture = false
 
     async executePrompt(
         number: number,
         prompt: any,
         onPreviewImage?: (img: string) => void,
-        onProgress?: (prog: number, max: number) => void
-    ): Promise<{
-        node: string
-        output: {
+        onProgress?: (prog: number, max: number) => void,
+        awaitNodeIds?: string[]
+    ): Promise<
+        Array<{
+            nodeId: string
             images: Array<{
                 filename: string
                 subfolder: string
                 type: string
             }>
-        }
-        prompt_id: string
-    }> {
+        }>
+    > {
         const progress = (data: any) => {
             const progress = data.detail.value as number
             const max = data.detail.max as number
@@ -315,25 +317,50 @@ class ComfyApi extends EventTarget {
         this.addEventListener("progress", progress)
         this.addEventListener("b_preview", b_preview)
 
-        const captured = new Map<string, any>()
-
-        const executed = (event: any) => {
-            captured.set(event.detail.prompt_id, event.detail)
+        if (!this.startedCapture) {
+            this.addEventListener("executed", (event: any) => {
+                console.log("captured output:", event.detail.node)
+                const detailsList = this.captured.get(event.detail.prompt_id) || []
+                detailsList.push({ nodeId: event.detail.node, images: event.detail.output.images })
+                this.captured.set(event.detail.prompt_id, detailsList)
+            })
+            this.startedCapture = true
         }
-
-        this.addEventListener("executed", executed)
 
         const res = await this.queuePrompt(number, prompt)
 
         return new Promise((resolve, reject) => {
             let timeout: any
-            const check = () => {
-                const data = captured.get(res.prompt_id)
+            const check = async () => {
+                const data = this.captured.get(res.prompt_id)
                 if (data) {
-                    clearTimeout(timeout)
-                    resolve(data)
+                    if (awaitNodeIds) {
+                        for (const nodeId of awaitNodeIds) {
+                            if (
+                                !data.find((item) => item.nodeId.toString() === nodeId.toString())
+                            ) {
+                                console.log("awaiting node", nodeId)
+                                timeout = setTimeout(check, 0)
 
-                    this.removeEventListener("executed", executed)
+                                return
+                            }
+                        }
+                    }
+
+                    console.log("finished ", res.prompt_id)
+
+                    const history = await this.getHistory()
+                    if (history.History.length > 0) {
+                        for (const item of history.History) {
+                            if (item.prompt[1] === res.prompt_id) {
+                                console.log("found matching history", item)
+                            }
+                        }
+                    }
+
+                    resolve(data)
+                    clearTimeout(timeout)
+
                     this.removeEventListener("progress", progress)
                     this.removeEventListener("b_preview", b_preview)
                 } else {
@@ -438,7 +465,7 @@ class ComfyApi extends EventTarget {
         await this.#postItem("interrupt", null)
     }
 
-    async uploadFile(file: File) {
+    async uploadFile(file: string | Blob) {
         try {
             const body = new FormData()
             body.append("image", file)
@@ -448,7 +475,7 @@ class ComfyApi extends EventTarget {
                 body,
             })
             if (resp.status === 200) {
-                const data = await resp.json()
+                const data = (await resp.json()) as ComfyFile
 
                 return data
             } else {

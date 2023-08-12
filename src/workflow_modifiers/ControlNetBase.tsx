@@ -5,11 +5,11 @@ import { useEffect, useState } from "react"
 import { ComfyFile, ComfyResources, api } from "../Api/Api"
 import {
     BuildWorkflow,
+    CollectOutput,
     ControlNetApplyAdvanced,
     ControlNetLoader,
     LoadImage,
     NodeLink,
-    PreviewImage,
 } from "../Api/Nodes"
 import { ImageUploadZone } from "../components/ImageUploadZone"
 import { LabeledCheckbox } from "../components/LabeledCheckbox"
@@ -138,21 +138,19 @@ export abstract class ControlNetPreprocessorBase extends BaseWorkflowConditionin
                 ;(async () => {
                     const res = await api.executePrompt(
                         0,
-                        BuildWorkflow(() => {
-                            const image = LoadImage({
-                                image: filename,
-                            }).IMAGE0
+                        (
+                            await BuildWorkflow(async () => {
+                                const image = LoadImage({
+                                    image: filename,
+                                }).IMAGE0
 
-                            const processedImage = this.runPreprocessor(image)
+                                const processedImage = this.runPreprocessor(image)
 
-                            console.log(processedImage)
-
-                            PreviewImage({
-                                images: processedImage,
+                                CollectOutput(processedImage)
                             })
-                        })
+                        )[0]
                     )
-                    const lol = res.output.images[0]
+                    const lol = res[res.length - 1].images[0]
 
                     setImageOverlayFile({
                         name: lol.filename,

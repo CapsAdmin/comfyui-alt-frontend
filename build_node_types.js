@@ -101,7 +101,15 @@ const emitNode = (name, node) => {
         const info = prop[1]
         let defaultValue = undefined
         if (typeof info == "object") {
-            defaultValue = info.default
+            defaultValue = JSON.stringify(info.default)
+            if (
+                typeof defaultValue == "string" &&
+                (defaultValue.includes(".safetensors") ||
+                    defaultValue.includes(".pt") ||
+                    defaultValue.includes(".ckpt"))
+            ) {
+                defaultValue = undefined
+            }
         }
         out += `        ["${name}"]${defaultValue === undefined ? "" : "?"}: ${emitProp(
             name,
@@ -119,13 +127,19 @@ const emitNode = (name, node) => {
         const info = prop[1]
         let defaultValue = undefined
         if (typeof info == "object") {
-            defaultValue = info.default
+            defaultValue = JSON.stringify(info.default)
+            if (
+                typeof defaultValue == "string" &&
+                (defaultValue.includes(".safetensors") ||
+                    defaultValue.includes(".pt") ||
+                    defaultValue.includes(".ckpt"))
+            ) {
+                defaultValue = undefined
+            }
         }
 
         if (defaultValue !== undefined) {
-            out += `    if (input["${name}"] === undefined) input["${name}"] = ${JSON.stringify(
-                defaultValue
-            )}\n`
+            out += `    if (input["${name}"] === undefined) input["${name}"] = ${defaultValue}\n`
         }
     }
 

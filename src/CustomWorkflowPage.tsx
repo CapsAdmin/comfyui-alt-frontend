@@ -21,13 +21,13 @@ import { MouseEvent, useEffect, useRef, useState } from "react"
 import { DragDropContext, Draggable, Droppable } from "react-beautiful-dnd"
 import { ComfyFile, ComfyResources, api, useComfyAPI } from "./Api/Api"
 import {
+    BNK_NoisyLatentImage,
     BuildWorkflow,
     CLIPSetLastLayer,
     CLIPTextEncode,
     CheckpointLoaderSimple,
     CollectOutput,
     ConditioningConcat,
-    EmptyLatentImage,
     HypernetworkLoader,
     ImageScale,
     KRestartSampler,
@@ -42,20 +42,22 @@ import {
     VAELoader,
 } from "./Api/Nodes"
 import { LabeledSlider } from "./components/LabeledSlider"
+import { WildCardDropZone, WildcardMap } from "./components/WildCardDropZone"
 import { comfyToGraphvizSVG } from "./utils/ComfyToGraphviz"
 import { PreprocessPrompts } from "./utils/prompts"
 import { uniqueObjectId } from "./utils/uid"
 import { DeserializeModifier, SerializeModifier } from "./workflow_modifiers/Base"
+import { ClipVision } from "./workflow_modifiers/conditioning/ClipVision"
 import {
-    ClipVision,
     ControlNetCannyEdge,
     ControlNetDepth,
     ControlNetLineArt,
-    FaceSwapper,
-    FaceUpscaler,
-    ImageToImage,
-    SeeCoder,
-} from "./workflow_modifiers/WorkflowModifiers"
+} from "./workflow_modifiers/conditioning/ControlNet"
+import { SeeCoder } from "./workflow_modifiers/conditioning/SeeCoder"
+import { ImageToImage } from "./workflow_modifiers/config/ImageToImage"
+import { FaceSwapper } from "./workflow_modifiers/postprocess/FaceSwapper"
+import { FaceUpscaler } from "./workflow_modifiers/postprocess/FaceUpscaler"
+
 const availableConditioners = [
     ClipVision,
     SeeCoder,
@@ -66,8 +68,6 @@ const availableConditioners = [
     FaceUpscaler,
     FaceSwapper,
 ] as const
-
-console.log(ClipVision.type)
 
 const BuildCustomWorkflow = async (config: {
     checkpoint: string
@@ -103,6 +103,8 @@ const BuildCustomWorkflow = async (config: {
     imageReferenceOnly?: boolean
 
     conditioners: Array<InstanceType<(typeof availableConditioners)[number]>>
+
+    wildcards?: WildcardMap
 }) => {
     return await BuildWorkflow(async () => {
         config = { ...config }
@@ -200,8 +202,26 @@ const BuildCustomWorkflow = async (config: {
             return conditionings[0]
         }
 
-        let positiveCondioning = handleBreaks(positive)
-        let negativeCondioning = handleBreaks(negative)
+        const handleWildcards = (prompt: string) => {
+            if (config.wildcards) {
+                // find all __*__ in the prompt
+                const matches = prompt.match(/__.*?__/g)
+                if (matches) {
+                    for (let match of matches) {
+                        match = match.slice(2, -2)
+                        const wildcard = config.wildcards[match]
+                        if (wildcard) {
+                            const randomCard = wildcard[Math.floor(Math.random() * wildcard.length)]
+                            prompt = prompt.replace(match, randomCard)
+                        }
+                    }
+                }
+            }
+            return prompt
+        }
+
+        let positiveCondioning = handleBreaks(handleWildcards(positive))
+        let negativeCondioning = handleBreaks(handleWildcards(negative))
 
         if (config.conditioners) {
             for (const conditioner of config.conditioners) {
@@ -250,7 +270,9 @@ const BuildCustomWorkflow = async (config: {
                 latent = res.LATENT1
             }
         } else {
-            latent = EmptyLatentImage({
+            latent = BNK_NoisyLatentImage({
+                seed: config.seed,
+                source: "CPU",
                 width: config.width,
                 height: config.height,
                 batch_size: config.batchSize,
@@ -640,6 +662,7 @@ export function CustomWorkflowPage() {
     const graphVizContainer = useRef<HTMLElement>(null)
     const [progress, setProgress] = useState(0)
     const [maxProgress, setMaxProgress] = useState(0)
+    const [wildcardMap, setWildcardMap] = useState<WildcardMap>({})
 
     const [config, setConfig] = useState<Config>({
         checkpoint: "",
@@ -667,7 +690,10 @@ export function CustomWorkflowPage() {
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const run = async () => {
-        const [graph, imageOutputs] = await BuildCustomWorkflow(config)
+        const [graph, imageOutputs] = await BuildCustomWorkflow({
+            ...config,
+            wildcards: wildcardMap,
+        })
 
         if (graphVizContainer.current) {
             const svgElement = comfyToGraphvizSVG(graph)
@@ -882,6 +908,11 @@ export function CustomWorkflowPage() {
                     </Card>
                 </Stack>
             </Stack>
+            <WildCardDropZone
+                onDrop={(map) => {
+                    setWildcardMap(map)
+                }}
+            ></WildCardDropZone>
             <Box ref={graphVizContainer}></Box>
         </Stack>
     )

@@ -519,7 +519,8 @@ export const useComfyAPI = () => {
         const loras = nodes.LoraLoader.input.required.lora_name[0]
         const hypernetworks = nodes.HypernetworkLoader.input.required.hypernetwork_name[0]
         const controlnets = nodes.ControlNetLoader.input.required.control_net_name[0]
-
+        const extensions = await api.getExtensions()
+        console.log(extensions)
         return {
             nodes,
             checkpoints,

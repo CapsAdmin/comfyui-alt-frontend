@@ -1,8 +1,8 @@
 import { Stack, Typography } from "@mui/material"
-import { LabeledSlider } from "../components/LabeledSlider"
+import { LabeledSlider } from "../../components/LabeledSlider"
 
 import { useEffect, useState } from "react"
-import { ComfyFile, ComfyResources, api } from "../Api/Api"
+import { ComfyFile, ComfyResources, api } from "../../Api/Api"
 import {
     BuildWorkflow,
     CollectOutput,
@@ -10,10 +10,10 @@ import {
     ControlNetLoader,
     LoadImage,
     NodeLink,
-} from "../Api/Nodes"
-import { ImageUploadZone } from "../components/ImageUploadZone"
-import { LabeledCheckbox } from "../components/LabeledCheckbox"
-import { BaseWorkflowConditioningModifier, ConditioningArgument } from "./Base"
+} from "../../Api/Nodes"
+import { ImageUploadZone } from "../../components/ImageUploadZone"
+import { LabeledCheckbox } from "../../components/LabeledCheckbox"
+import { BaseWorkflowConditioningModifier, ConditioningArgument } from "./../Base"
 
 let timerId: number
 

@@ -1,7 +1,7 @@
-import { Stack, Typography } from "@mui/material"
+import { MenuItem, Select, Stack, Typography } from "@mui/material"
 import { LabeledSlider } from "../../components/LabeledSlider"
 
-import { ComfyFile, ComfyResources } from "../../Api/Api"
+import { ComfyFile, ComfyResources, useRuntimeNodeProperty } from "../../Api/Api"
 import { ConditioningAverage_, ImageScale, LoadImage, SEECoderImageEncode } from "../../Api/Nodes"
 import { ImageUploadZone } from "../../components/ImageUploadZone"
 import { BaseWorkflowConditioningModifier, ConditioningArgument } from "./../Base"
@@ -12,6 +12,7 @@ export class SeeCoder extends BaseWorkflowConditioningModifier {
     config = {
         strength: 1,
         image: undefined as ComfyFile | undefined,
+        model: "seecoder-v1-0.safetensors",
     }
     override apply(conditioning: ConditioningArgument, resources: ComfyResources) {
         const image = LoadImage({
@@ -28,7 +29,7 @@ export class SeeCoder extends BaseWorkflowConditioningModifier {
 
         const applier = SEECoderImageEncode({
             image: scaledImage,
-            seecoder_name: "seecoder-v1-0.safetensors",
+            seecoder_name: this.config.model,
         })
 
         const averager = ConditioningAverage_({
@@ -44,14 +45,30 @@ export class SeeCoder extends BaseWorkflowConditioningModifier {
         value: SeeCoder["config"]
         onChange: (value: typeof props.value) => void
     }) => {
+        const availableModels = useRuntimeNodeProperty<string[]>(
+            "SEECoderImageEncode",
+            "seecoder_name"
+        )
+
         return (
             <Stack>
                 <Typography>{this.title}</Typography>
+
                 <ImageUploadZone
                     value={props.value.image}
                     onChange={(file) => props.onChange({ ...props.value, image: file })}
                 />
                 <Stack>
+                    <Select
+                        value={props.value.model}
+                        onChange={(e) =>
+                            props.onChange({ ...props.value, model: e.target.value as any })
+                        }
+                    >
+                        {availableModels.available.map((model) => (
+                            <MenuItem value={model}>{model}</MenuItem>
+                        ))}
+                    </Select>
                     <LabeledSlider
                         value={props.value.strength}
                         onChange={(v) => props.onChange({ ...props.value, strength: v })}

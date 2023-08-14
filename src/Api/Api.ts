@@ -465,6 +465,15 @@ class ComfyApi extends EventTarget {
         await this.#postItem("interrupt", null)
     }
 
+    async resourceHash(type: string, name: string) {
+        const res = await this.fetch("/hash/" + type + "/" + name.replace("/", "%2F"))
+        return res.text()
+    }
+    async getMetaData(type: string, name: string) {
+        const res = await this.fetch("/metadata/" + type + "/" + name.replace("/", "%2F"))
+        return res.json()
+    }
+
     async uploadFile(file: string | Blob) {
         try {
             const body = new FormData()
@@ -519,8 +528,6 @@ export const useComfyAPI = () => {
         const loras = nodes.LoraLoader.input.required.lora_name[0]
         const hypernetworks = nodes.HypernetworkLoader.input.required.hypernetwork_name[0]
         const controlnets = nodes.ControlNetLoader.input.required.control_net_name[0]
-        const extensions = await api.getExtensions()
-        console.log(extensions)
         return {
             nodes,
             checkpoints,
@@ -535,6 +542,127 @@ export const useComfyAPI = () => {
             restartSamplingSchedulers,
         } as ComfyResources
     }, "comfyresources")
+}
+
+export type CivitAiModelInfo = {
+    id: number
+    modelId: number
+    name: string
+    createdAt: string
+    updatedAt: string
+    trainedWords: Array<string>
+    baseModel: string
+    baseModelType: string
+    earlyAccessTimeFrame: number
+    description: any
+    stats: {
+        downloadCount: number
+        ratingCount: number
+        rating: number
+    }
+    model: {
+        name: string
+        type: string
+        nsfw: boolean
+        poi: boolean
+    }
+    files: Array<{
+        id: number
+        url: string
+        sizeKB: number
+        name: string
+        type: string
+        metadata: {
+            fp: any
+            size: any
+            format: string
+        }
+        pickleScanResult: string
+        pickleScanMessage: string
+        virusScanResult: string
+        virusScanMessage: any
+        scannedAt: string
+        hashes: {
+            AutoV1: string
+            AutoV2: string
+            SHA256: string
+            CRC32: string
+            BLAKE3: string
+        }
+        primary: boolean
+        downloadUrl: string
+    }>
+    images: Array<{
+        url: string
+        nsfw: string
+        width: number
+        height: number
+        hash: string
+        type: string
+        metadata: {
+            hash: string
+            width: number
+            height: number
+        }
+        meta: {
+            Size: string
+            seed: number
+            Model: string
+            steps: number
+            hashes: {
+                model: string
+            }
+            prompt: string
+            sampler: string
+            cfgScale: number
+            resources: Array<{
+                name: string
+                type: string
+                weight?: number
+                hash?: string
+            }>
+            "Model hash": string
+            "Hires upscale": string
+            "Hires upscaler": string
+            negativePrompt?: string
+            "Seed resize from": string
+            "Denoising strength": string
+        }
+    }>
+    downloadUrl: string
+}
+
+export const useCivitAIInfo = (type: string, name: string) => {
+    return usePromise(async () => {
+        const hash = await api.resourceHash(type, name)
+        const metadata = await api.getMetaData(type, name)
+        const res = await fetch("https://civitai.com/api/v1/model-versions/by-hash/" + hash)
+        const info = (await res.json()) as CivitAiModelInfo
+        return [info, metadata] as const
+    }, "civitaiinfo" + type + name)
+}
+export const useRuntimeNodeProperty = <T>(nodeName: string, prop: string) => {
+    const resources = useComfyAPI()
+
+    //resources.nodes.SEECoderImageEncode.input.required.seecoder_name[0]
+    const node = resources.nodes[nodeName]
+    if (!node) {
+        throw new Error(`Node ${nodeName} not found`)
+    }
+    let input = node.input.required[prop]
+
+    if (!input && node.input.optional) {
+        input = node.input.optional[prop]
+    }
+
+    if (!input) {
+        throw new Error(`Node ${nodeName} has no property ${prop}`)
+    }
+
+    return {
+        ...input[1],
+        available: input[0] as T,
+    }
 }
 
 export type ComfyNodeDef = {

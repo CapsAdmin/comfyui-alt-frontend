@@ -3,6 +3,7 @@ import { NodeLink } from "../Api/Nodes"
 import { Config } from "../CustomWorkflowPage"
 
 export type ConditioningArgument = { positive: NodeLink; negative: NodeLink }
+export type NetworkArgument = { model: NodeLink; clip: NodeLink }
 abstract class BaseWorkflowModifier {
     abstract title: string
     abstract config: { [key: string]: any }
@@ -18,6 +19,11 @@ export abstract class BaseWorkflowConditioningModifier extends BaseWorkflowModif
         conditioning: ConditioningArgument,
         resources: ComfyResources
     ): ConditioningArgument
+}
+
+export abstract class BaseWorkflowNetworkModifier extends BaseWorkflowModifier {
+    static type = "network"
+    abstract apply(network: NetworkArgument, resources: ComfyResources): NetworkArgument
 }
 
 export abstract class BaseWorkflowPostprocessModifier extends BaseWorkflowModifier {

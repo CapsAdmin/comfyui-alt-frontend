@@ -5,6 +5,7 @@ import {
     Box,
     Button,
     Card,
+    Checkbox,
     Fab,
     IconButton,
     LinearProgress,
@@ -21,17 +22,21 @@ import { MouseEvent, useEffect, useRef, useState } from "react"
 import { DragDropContext, Draggable, Droppable } from "react-beautiful-dnd"
 import { ComfyFile, ComfyResources, api, useComfyAPI } from "./Api/Api"
 import {
+    BNK_GetSigma,
+    BNK_InjectNoise,
     BNK_NoisyLatentImage,
+    BNK_SlerpLatent,
     BuildWorkflow,
     CLIPSetLastLayer,
     CLIPTextEncode,
     CheckpointLoaderSimple,
     CollectOutput,
     ConditioningConcat,
+    EmptyLatentImage,
     HypernetworkLoader,
     ImageScale,
     KRestartSampler,
-    KSampler,
+    KSamplerAdvanced,
     LoadImage,
     LoraLoader,
     ReferenceOnlySimple,
@@ -55,6 +60,7 @@ import {
 } from "./workflow_modifiers/conditioning/ControlNet"
 import { SeeCoder } from "./workflow_modifiers/conditioning/SeeCoder"
 import { ImageToImage } from "./workflow_modifiers/config/ImageToImage"
+import { NetworkModifier } from "./workflow_modifiers/network/Network"
 import { FaceSwapper } from "./workflow_modifiers/postprocess/FaceSwapper"
 import { FaceUpscaler } from "./workflow_modifiers/postprocess/FaceUpscaler"
 
@@ -67,6 +73,7 @@ const availableConditioners = [
     ControlNetCannyEdge,
     FaceUpscaler,
     FaceSwapper,
+    NetworkModifier,
 ] as const
 
 const BuildCustomWorkflow = async (config: {
@@ -94,6 +101,7 @@ const BuildCustomWorkflow = async (config: {
     cfgScale: number
     cfgRescale: number
     seed: number
+    subSeed: number
 
     resources: ComfyResources
 
@@ -236,6 +244,17 @@ const BuildCustomWorkflow = async (config: {
 
                     positiveCondioning = res.positive
                     negativeCondioning = res.negative
+                } else if (conditioner.type == "network") {
+                    const res = conditioner.apply(
+                        {
+                            model: model,
+                            clip: clip,
+                        },
+                        config.resources
+                    )
+
+                    model = res.model
+                    clip = res.clip
                 }
             }
         }
@@ -270,12 +289,46 @@ const BuildCustomWorkflow = async (config: {
                 latent = res.LATENT1
             }
         } else {
-            latent = BNK_NoisyLatentImage({
+            const latent1 = BNK_NoisyLatentImage({
                 seed: config.seed,
                 source: "CPU",
                 width: config.width,
                 height: config.height,
                 batch_size: config.batchSize,
+            }).LATENT0
+            const latent2 = BNK_NoisyLatentImage({
+                seed: config.seed + 1,
+                source: "CPU",
+                width: config.width,
+                height: config.height,
+                batch_size: config.batchSize,
+            }).LATENT0
+
+            const emptyLatent = EmptyLatentImage({
+                width: config.width,
+                height: config.height,
+                batch_size: config.batchSize,
+            }).LATENT0
+
+            const lerpedNoise = BNK_SlerpLatent({
+                latents1: latent1,
+                latents2: latent2,
+                factor: config.subSeed,
+            }).LATENT0
+
+            const sigmas = BNK_GetSigma({
+                model: model,
+                sampler_name: config.samplingMethod,
+                scheduler: config.samplingScheduler as any,
+                steps: config.samplingSteps,
+                start_at_step: 0,
+                end_at_step: config.samplingSteps,
+            }).FLOAT0
+
+            latent = BNK_InjectNoise({
+                latents: emptyLatent,
+                noise: lerpedNoise,
+                strength: sigmas,
             }).LATENT0
         }
 
@@ -306,13 +359,18 @@ const BuildCustomWorkflow = async (config: {
                 restart_scheduler: config.restartSamplingScheduler as any,
             }).LATENT0
         } else {
-            resultLatent = KSampler({
+            resultLatent = KSamplerAdvanced({
                 steps: config.samplingSteps,
                 cfg: config.cfgScale,
                 sampler_name: config.samplingMethod,
                 scheduler: config.samplingScheduler as any,
-                denoise: config.imageDenoise || 1,
-                seed: config.seed,
+                noise_seed: 0,
+                add_noise: "disable",
+                return_with_leftover_noise: "disable",
+
+                // use denoise ratio
+                end_at_step: config.samplingSteps,
+                start_at_step: 0,
 
                 model: model,
                 positive: positiveCondioning,
@@ -520,13 +578,18 @@ const Prompts = (props: { config: Config; setConfig: (config: Config) => void })
     return (
         <Stack flex={1} spacing={1}>
             <TextField
+                id="positive-prompts"
                 label="positive"
                 value={config.positive}
-                onChange={(e) => setConfig({ ...config, positive: e.target.value })}
+                onChange={(e) => {
+                    console.log(e)
+                    setConfig({ ...config, positive: e.target.value })
+                }}
                 multiline
                 minRows={3}
             />
             <TextField
+                id="negative-prompts"
                 label="negative"
                 value={config.negative}
                 onChange={(e) => setConfig({ ...config, negative: e.target.value })}
@@ -654,6 +717,16 @@ export const getLastOutput = () => {
     return lastOutput
 }
 
+let configSetter = null
+let currentConfig = null
+export const setWorkflowConfig = (config: Config) => {
+    configSetter(config)
+}
+
+export const getWorkflowConfig = () => {
+    return currentConfig
+}
+
 const savedConfig = localStorage.getItem("customWorkflowConfig")
 let loadedConfig = savedConfig == null
 export function CustomWorkflowPage() {
@@ -663,6 +736,7 @@ export function CustomWorkflowPage() {
     const [progress, setProgress] = useState(0)
     const [maxProgress, setMaxProgress] = useState(0)
     const [wildcardMap, setWildcardMap] = useState<WildcardMap>({})
+    const [randomizeSeed, setRandomizeSeed] = useState(false)
 
     const [config, setConfig] = useState<Config>({
         checkpoint: "",
@@ -682,17 +756,28 @@ export function CustomWorkflowPage() {
         cfgScale: 7.5,
         cfgRescale: 0,
         seed: 0,
+        subSeed: 0,
         conditioners: [],
         batchSize: 1,
         batchCount: 1,
         resources,
     })
 
+    configSetter = setConfig
+    currentConfig = config
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const run = async () => {
+        let randomSeed = config.seed
+        if (randomizeSeed) {
+            randomSeed = Math.round(Math.random() * 100000)
+            setConfig({ ...config, seed: randomSeed })
+        }
+
         const [graph, imageOutputs] = await BuildCustomWorkflow({
             ...config,
             wildcards: wildcardMap,
+            seed: randomSeed,
         })
 
         if (graphVizContainer.current) {
@@ -842,14 +927,27 @@ export function CustomWorkflowPage() {
                                         step={1}
                                         label="Sampling Steps"
                                     ></LabeledSlider>
-
+                                    <Stack direction={"row"}>
+                                        <LabeledSlider
+                                            value={config.seed}
+                                            onChange={(v) => setConfig({ ...config, seed: v })}
+                                            min={0}
+                                            max={100000}
+                                            step={1}
+                                            label="Noise Seed"
+                                        />
+                                        <Checkbox
+                                            checked={randomizeSeed}
+                                            onChange={(e) => setRandomizeSeed(e.target.checked)}
+                                        ></Checkbox>
+                                    </Stack>
                                     <LabeledSlider
-                                        value={config.seed}
-                                        onChange={(v) => setConfig({ ...config, seed: v })}
-                                        min={-1}
-                                        max={10000000000000}
-                                        step={1}
-                                        label="Noise Seed"
+                                        value={config.subSeed}
+                                        onChange={(v) => setConfig({ ...config, subSeed: v })}
+                                        min={0}
+                                        max={1}
+                                        step={0.001}
+                                        label="Noise Sub Seed"
                                     />
                                 </Stack>
                             </Box>

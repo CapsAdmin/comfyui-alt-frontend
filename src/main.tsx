@@ -5,6 +5,7 @@ import { DndProvider } from "react-dnd"
 import { HTML5Backend } from "react-dnd-html5-backend"
 import ReactDOM from "react-dom/client"
 import { CustomWorkflowPage } from "./CustomWorkflowPage.tsx"
+import { CivitAIExplorer } from "./components/CivitAiExplorer.tsx"
 const darkTheme = createTheme({
     palette: {
         mode: "dark",
@@ -17,6 +18,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <DndProvider backend={HTML5Backend}>
             <Suspense fallback={<div>loading rates</div>}>
                 <CustomWorkflowPage />
+                <CivitAIExplorer />
             </Suspense>
         </DndProvider>
     </ThemeProvider>
